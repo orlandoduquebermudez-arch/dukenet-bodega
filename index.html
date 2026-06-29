@@ -1,0 +1,1417 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DN Bodega">
+<meta name="theme-color" content="#0d47a1">
+<meta name="description" content="Control de bodega Dukenet ISP FTTH">
+<title>Dukenet — Control de Bodega</title>
+<link rel="manifest" href="./manifest.json">
+<!-- Apple touch icons (inline SVG fallback) -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%230d47a1'/%3E%3Ctext x='90' y='125' text-anchor='middle' font-size='90' fill='%2300bcd4'%3E📦%3C/text%3E%3C/svg%3E">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --dn-blue: #0d47a1;
+    --dn-cyan: #00bcd4;
+    --dn-dark: #0a1929;
+    --dn-sidebar: #0d2137;
+    --dn-border: #e3e8ef;
+    --dn-muted: #6c757d;
+    --dn-success: #2e7d32;
+    --dn-warning: #f57c00;
+    --dn-danger: #c62828;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-top: env(safe-area-inset-top, 0px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; background: #f0f4f8; color: #1a2332; overscroll-behavior: none; }
+
+  /* ─── OFFLINE BANNER ─── */
+  #offlineBanner {
+    display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+    background: #e65100; color: #fff; text-align: center; padding: .5rem;
+    font-size: .82rem; font-weight: 600;
+  }
+  #offlineBanner.show { display: block; }
+
+  /* ─── INSTALL PROMPT ─── */
+  #installBanner {
+    display: none; position: fixed; bottom: calc(60px + var(--safe-bottom)); left: 1rem; right: 1rem; z-index: 8000;
+    background: var(--dn-blue); color: #fff; border-radius: 14px; padding: .9rem 1rem;
+    box-shadow: 0 8px 30px rgba(0,0,0,.25); animation: slideUp .3s ease;
+  }
+  #installBanner.show { display: flex; align-items: center; gap: .75rem; }
+  @keyframes slideUp { from { transform: translateY(20px); opacity:0; } to { transform: translateY(0); opacity:1; } }
+  .btn-install { background: var(--dn-cyan); color: #fff; border: none; border-radius: 8px; padding: .45rem .9rem; font-size: .85rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  .btn-dismiss { background: none; border: none; color: rgba(255,255,255,.7); font-size: 1.1rem; cursor: pointer; margin-left: auto; }
+
+  /* ─── LOGIN ─── */
+  #loginScreen {
+    min-height: 100vh; min-height: -webkit-fill-available;
+    background: linear-gradient(135deg, var(--dn-dark) 0%, #1565c0 60%, var(--dn-cyan) 100%);
+    display: flex; align-items: center; justify-content: center; padding: 1rem;
+  }
+  .login-card {
+    background: rgba(255,255,255,.97); border-radius: 20px;
+    padding: 2rem 1.5rem; width: 100%; max-width: 400px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.35);
+  }
+  .login-logo { text-align: center; margin-bottom: 1.5rem; }
+  .login-logo .brand { font-size: 2rem; font-weight: 800; color: var(--dn-blue); letter-spacing: 1px; }
+  .login-logo .sub { font-size: .82rem; color: var(--dn-muted); }
+  .login-logo i { font-size: 2.8rem; color: var(--dn-cyan); }
+  .btn-login { background: var(--dn-blue); color: #fff; border: none; width: 100%; padding: .85rem; border-radius: 12px; font-size: 1rem; font-weight: 700; cursor: pointer; }
+  .btn-login:active { background: #1565c0; }
+  .demo-chip { display: inline-block; background: #e3f2fd; color: var(--dn-blue); border-radius: 20px; padding: 4px 12px; margin: 2px; cursor: pointer; font-size: .78rem; }
+  .demo-chip:active { background: var(--dn-cyan); color: #fff; }
+
+  /* ─── APP SHELL ─── */
+  #appShell { display: none; min-height: 100vh; }
+
+  /* ─── SIDEBAR (desktop) ─── */
+  .sidebar {
+    position: fixed; top: 0; left: 0; height: 100vh; width: 240px;
+    background: var(--dn-sidebar); color: #fff; z-index: 1000;
+    display: flex; flex-direction: column; transition: transform .25s ease;
+    overflow: hidden;
+  }
+  .sidebar-header { padding: 1.2rem 1rem; border-bottom: 1px solid rgba(255,255,255,.1); display: flex; align-items: center; gap: .7rem; }
+  .sidebar-header .brand-text { font-weight: 800; font-size: 1.2rem; color: var(--dn-cyan); }
+  .sidebar-header .brand-sub { font-size: .7rem; color: rgba(255,255,255,.5); }
+  .sidebar-header i { font-size: 1.6rem; color: var(--dn-cyan); }
+  .sidebar-user { padding: .8rem 1rem; border-bottom: 1px solid rgba(255,255,255,.08); font-size: .82rem; }
+  .sidebar-user .u-name { font-weight: 600; color: #fff; }
+  .sidebar-user .u-role { color: rgba(255,255,255,.5); font-size: .75rem; }
+  .u-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--dn-cyan); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: .9rem; margin-right: .5rem; flex-shrink: 0; }
+  nav.sidebar-nav { flex: 1; overflow-y: auto; padding: .5rem 0; }
+  .nav-section { font-size: .68rem; color: rgba(255,255,255,.35); padding: .8rem 1rem .3rem; text-transform: uppercase; letter-spacing: 1px; }
+  .nav-item-link { display: flex; align-items: center; gap: .7rem; padding: .7rem 1rem; color: rgba(255,255,255,.75); text-decoration: none; font-size: .88rem; cursor: pointer; transition: background .15s; border-left: 3px solid transparent; }
+  .nav-item-link:hover, .nav-item-link:active { background: rgba(255,255,255,.07); color: #fff; }
+  .nav-item-link.active { background: rgba(0,188,212,.12); color: var(--dn-cyan); border-left-color: var(--dn-cyan); font-weight: 600; }
+  .nav-item-link i { width: 18px; text-align: center; }
+  .sidebar-footer { padding: .8rem 1rem; border-top: 1px solid rgba(255,255,255,.08); }
+  .btn-logout { color: rgba(255,255,255,.6); background: none; border: 1px solid rgba(255,255,255,.15); border-radius: 8px; padding: .4rem .8rem; font-size: .82rem; cursor: pointer; width: 100%; }
+  .btn-logout:active { background: rgba(255,0,0,.15); }
+
+  /* Overlay para cerrar sidebar en mobile */
+  #sidebarOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 999; }
+  #sidebarOverlay.show { display: block; }
+
+  /* ─── MAIN ─── */
+  .main-content { margin-left: 240px; min-height: 100vh; padding-bottom: 0; }
+  .topbar {
+    background: #fff; padding: .75rem 1.2rem;
+    border-bottom: 1px solid var(--dn-border);
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 500;
+  }
+  .topbar-left { display: flex; align-items: center; gap: .6rem; }
+  .btn-menu { display: none; background: none; border: none; font-size: 1.2rem; color: var(--dn-dark); cursor: pointer; padding: 4px 8px; }
+  .topbar h5 { font-weight: 700; color: var(--dn-dark); font-size: .95rem; margin: 0; }
+  .topbar .date-badge { font-size: .72rem; color: var(--dn-muted); }
+  .page-content { padding: 1rem 1.2rem; }
+
+  /* ─── BOTTOM NAV (móvil) ─── */
+  .bottom-nav {
+    display: none; position: fixed; bottom: 0; left: 0; right: 0;
+    background: #fff; border-top: 1px solid var(--dn-border);
+    z-index: 900; padding-bottom: var(--safe-bottom);
+    box-shadow: 0 -2px 12px rgba(0,0,0,.1);
+  }
+  .bottom-nav-inner { display: flex; justify-content: space-around; padding: .3rem 0; }
+  .bn-item { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: .4rem .6rem; cursor: pointer; color: var(--dn-muted); font-size: .65rem; font-weight: 600; border: none; background: none; flex: 1; transition: color .15s; text-transform: uppercase; letter-spacing: .3px; }
+  .bn-item i { font-size: 1.1rem; }
+  .bn-item.active { color: var(--dn-blue); }
+  .bn-item:active { color: var(--dn-cyan); }
+
+  /* ─── STAT CARDS ─── */
+  .stat-card { background: #fff; border-radius: 14px; padding: 1rem 1.1rem; box-shadow: 0 2px 12px rgba(0,0,0,.06); border: 1px solid var(--dn-border); display: flex; align-items: center; gap: .85rem; }
+  .stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; }
+  .stat-icon.blue { background: #e3f2fd; color: var(--dn-blue); }
+  .stat-icon.cyan { background: #e0f7fa; color: #00838f; }
+  .stat-icon.green { background: #e8f5e9; color: var(--dn-success); }
+  .stat-icon.orange { background: #fff3e0; color: var(--dn-warning); }
+  .stat-icon.red { background: #ffebee; color: var(--dn-danger); }
+  .stat-icon.purple { background: #f3e5f5; color: #7b1fa2; }
+  .stat-val { font-size: 1.6rem; font-weight: 800; line-height: 1; }
+  .stat-lbl { font-size: .72rem; color: var(--dn-muted); margin-top: 2px; }
+
+  /* ─── PANELS ─── */
+  .panel { background: #fff; border-radius: 14px; border: 1px solid var(--dn-border); box-shadow: 0 2px 12px rgba(0,0,0,.05); overflow: hidden; }
+  .panel-header { padding: .9rem 1.1rem; border-bottom: 1px solid var(--dn-border); display: flex; align-items: center; justify-content: space-between; background: #fafbfc; flex-wrap: wrap; gap: .5rem; }
+  .panel-header h6 { font-weight: 700; margin: 0; font-size: .92rem; }
+  .panel-body { padding: 1rem; }
+
+  /* ─── TABLAS ─── */
+  .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .table-dn { width: 100%; border-collapse: collapse; font-size: .84rem; min-width: 500px; }
+  .table-dn th { background: #f8fafc; color: var(--dn-muted); font-weight: 600; font-size: .72rem; text-transform: uppercase; letter-spacing: .5px; padding: .6rem .85rem; border-bottom: 2px solid var(--dn-border); white-space: nowrap; }
+  .table-dn td { padding: .65rem .85rem; border-bottom: 1px solid #f1f3f6; vertical-align: middle; }
+  .table-dn tr:last-child td { border-bottom: none; }
+  .table-dn tr:hover td { background: #f9fbff; }
+
+  /* ─── BADGES ─── */
+  .badge-dn { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 20px; font-size: .73rem; font-weight: 600; white-space: nowrap; }
+  .badge-ok { background: #e8f5e9; color: var(--dn-success); }
+  .badge-warn { background: #fff3e0; color: var(--dn-warning); }
+  .badge-danger { background: #ffebee; color: var(--dn-danger); }
+  .badge-info { background: #e3f2fd; color: var(--dn-blue); }
+  .badge-purple { background: #f3e5f5; color: #7b1fa2; }
+  .badge-gray { background: #f1f3f5; color: #555; }
+  .badge-cyan { background: #e0f7fa; color: #00838f; }
+
+  /* ─── STOCK BAR ─── */
+  .stock-bar { height: 6px; border-radius: 4px; background: #e9ecef; overflow: hidden; min-width: 70px; }
+  .stock-fill { height: 100%; border-radius: 4px; transition: width .3s; }
+
+  /* ─── FORMS ─── */
+  .form-control, .form-select { border-radius: 10px; border: 1px solid var(--dn-border); font-size: .9rem; padding: .6rem .9rem; }
+  .form-control:focus, .form-select:focus { border-color: var(--dn-cyan); box-shadow: 0 0 0 3px rgba(0,188,212,.15); }
+  .form-label { font-size: .8rem; font-weight: 600; color: #2c3e50; margin-bottom: .3rem; }
+
+  /* ─── BUTTONS ─── */
+  .btn-primary-dn { background: var(--dn-blue); color: #fff; border: none; border-radius: 10px; padding: .55rem 1rem; font-size: .88rem; font-weight: 600; cursor: pointer; }
+  .btn-primary-dn:active { background: #1565c0; }
+  .btn-cyan-dn { background: var(--dn-cyan); color: #fff; border: none; border-radius: 10px; padding: .55rem 1rem; font-size: .88rem; font-weight: 600; cursor: pointer; }
+  .btn-cyan-dn:active { background: #00acc1; }
+  .btn-outline-dn { background: transparent; color: var(--dn-blue); border: 1px solid var(--dn-blue); border-radius: 10px; padding: .45rem .9rem; font-size: .85rem; cursor: pointer; }
+  .btn-outline-dn.active, .btn-outline-dn:active { background: var(--dn-blue); color: #fff; }
+  .btn-sm-icon { background: none; border: none; cursor: pointer; padding: 5px 8px; border-radius: 7px; font-size: .9rem; }
+  .btn-sm-icon:active { background: #eee; }
+  .btn-danger-dn { background: var(--dn-danger); color: #fff; border: none; border-radius: 10px; padding: .45rem .9rem; font-size: .85rem; cursor: pointer; }
+
+  /* ─── MOBILE CARDS (alternativa a tabla en móvil) ─── */
+  .mobile-card { background: #fff; border-radius: 12px; border: 1px solid var(--dn-border); padding: .9rem 1rem; margin-bottom: .6rem; box-shadow: 0 1px 6px rgba(0,0,0,.04); }
+  .mobile-card-title { font-weight: 700; font-size: .9rem; margin-bottom: .3rem; }
+  .mobile-card-sub { font-size: .78rem; color: var(--dn-muted); }
+
+  /* ─── TASK CARD ─── */
+  .task-card { border: 1px solid var(--dn-border); border-radius: 12px; padding: .9rem 1rem; margin-bottom: .65rem; border-left: 4px solid var(--dn-blue); }
+  .task-card.pendiente { border-left-color: var(--dn-warning); }
+  .task-card.en_progreso { border-left-color: var(--dn-cyan); }
+  .task-card.completada { border-left-color: var(--dn-success); }
+  .task-card.cancelada { border-left-color: #999; }
+
+  /* ─── ACTIVITY ─── */
+  .activity-item { display: flex; gap: .7rem; padding: .55rem 0; border-bottom: 1px solid #f1f3f6; }
+  .activity-item:last-child { border-bottom: none; }
+  .activity-dot { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .78rem; flex-shrink: 0; }
+  .activity-text { font-size: .82rem; }
+  .activity-time { font-size: .73rem; color: var(--dn-muted); }
+
+  /* ─── ALERTS ─── */
+  .alert-dn { border-radius: 10px; padding: .7rem .9rem; font-size: .84rem; margin-bottom: .75rem; display: flex; align-items: flex-start; gap: .5rem; }
+  .alert-success { background: #e8f5e9; color: #1b5e20; border-left: 4px solid #4caf50; }
+  .alert-warning { background: #fff8e1; color: #e65100; border-left: 4px solid #ff9800; }
+  .alert-danger  { background: #ffebee; color: #b71c1c; border-left: 4px solid #f44336; }
+  .alert-info    { background: #e3f2fd; color: #0d47a1; border-left: 4px solid #2196f3; }
+
+  /* ─── MODAL ─── */
+  .modal-content { border-radius: 16px; border: none; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+  .modal-header { border-bottom: 1px solid var(--dn-border); padding: 1.1rem 1.3rem; }
+  .modal-title { font-weight: 700; font-size: .97rem; }
+  .modal-footer { border-top: 1px solid var(--dn-border); }
+
+  /* ─── MISC ─── */
+  .section-page { display: none; }
+  .section-page.active { display: block; }
+  .search-box { position: relative; }
+  .search-box input { padding-left: 2rem; }
+  .search-box i { position: absolute; left: .65rem; top: 50%; transform: translateY(-50%); color: var(--dn-muted); font-size: .85rem; }
+  .empty-state { text-align: center; padding: 2.5rem 1rem; color: var(--dn-muted); }
+  .empty-state i { font-size: 2.2rem; margin-bottom: .6rem; display: block; }
+  .chip-category { display: inline-block; padding: 2px 7px; border-radius: 12px; font-size: .71rem; font-weight: 600; background: #e3f2fd; color: var(--dn-blue); }
+  .chip-category.ftth { background: #e0f7fa; color: #00838f; }
+  .chip-category.equipos { background: #f3e5f5; color: #7b1fa2; }
+  .chip-category.herramientas { background: #fff8e1; color: #e65100; }
+  .chip-category.consumibles { background: #e8f5e9; color: var(--dn-success); }
+  .notification-dot { width: 8px; height: 8px; background: #f44336; border-radius: 50%; display: inline-block; margin-left: 4px; }
+  .w-100 { width: 100%; }
+  .cursor-pointer { cursor: pointer; }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 768px) {
+    .sidebar { transform: translateX(-100%); width: 260px; }
+    .sidebar.open { transform: translateX(0); box-shadow: 4px 0 30px rgba(0,0,0,.3); }
+    .btn-menu { display: block; }
+    .main-content { margin-left: 0; padding-bottom: calc(65px + var(--safe-bottom)); }
+    .bottom-nav { display: block; }
+    .page-content { padding: .75rem; }
+    .topbar { padding: .65rem .85rem; }
+    .topbar .date-badge { display: none; }
+    #topbarRole { display: none; }
+    .stat-val { font-size: 1.4rem; }
+    .panel-header { gap: .4rem; }
+    .panel-header .d-flex { flex-wrap: wrap; }
+  }
+  @media (max-width: 480px) {
+    .login-card { padding: 1.5rem 1rem; }
+    .panel-body { padding: .75rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- OFFLINE BANNER -->
+<div id="offlineBanner"><i class="fas fa-wifi-slash me-2"></i>Sin conexión — trabajando en modo offline</div>
+
+<!-- INSTALL PROMPT -->
+<div id="installBanner">
+  <i class="fas fa-download" style="font-size:1.3rem"></i>
+  <div><div style="font-weight:700;font-size:.88rem">Instalar app Dukenet</div><div style="font-size:.75rem;opacity:.8">Accede desde tu pantalla de inicio</div></div>
+  <button class="btn-install" id="btnInstall">Instalar</button>
+  <button class="btn-dismiss" id="btnDismiss"><i class="fas fa-times"></i></button>
+</div>
+
+<!-- ══════════════════ LOGIN ══════════════════ -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">
+      <i class="fas fa-warehouse"></i>
+      <div class="brand">DUKENET</div>
+      <div class="sub">Sistema de Control de Bodega · FTTH &amp; TV</div>
+    </div>
+    <div id="loginAlert"></div>
+    <div class="mb-3">
+      <label class="form-label">Usuario</label>
+      <input id="loginUser" type="text" class="form-control" placeholder="Ingresa tu usuario" autocomplete="username" autocapitalize="none">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Contraseña</label>
+      <input id="loginPass" type="password" class="form-control" placeholder="Contraseña" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn-login" onclick="doLogin()"><i class="fas fa-sign-in-alt me-2"></i>Iniciar Sesión</button>
+    <div class="mt-3" style="font-size:.78rem;color:var(--dn-muted)">
+      <div class="mb-1"><strong>Usuarios demo:</strong></div>
+      <span class="demo-chip" onclick="fillDemo('admin','admin123')"><i class="fas fa-user-shield"></i> admin</span>
+      <span class="demo-chip" onclick="fillDemo('bodeguero','bod123')"><i class="fas fa-boxes-stacked"></i> bodeguero</span>
+      <span class="demo-chip" onclick="fillDemo('tecnico1','tec123')"><i class="fas fa-hard-hat"></i> tecnico1</span>
+      <span class="demo-chip" onclick="fillDemo('supervisor','sup123')"><i class="fas fa-chart-bar"></i> supervisor</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ APP SHELL ══════════════════ -->
+<div id="appShell">
+  <!-- Overlay sidebar móvil -->
+  <div id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <i class="fas fa-warehouse"></i>
+      <div><div class="brand-text">DUKENET</div><div class="brand-sub">Bodega ISP</div></div>
+      <button onclick="closeSidebar()" style="background:none;border:none;color:rgba(255,255,255,.5);margin-left:auto;cursor:pointer;font-size:1.1rem"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="sidebar-user d-flex align-items-center gap-2">
+      <div class="u-avatar" id="sidebarAvatar">A</div>
+      <div><div class="u-name" id="sidebarName">Usuario</div><div class="u-role" id="sidebarRole">Rol</div></div>
+    </div>
+    <nav class="sidebar-nav" id="sidebarNav"></nav>
+    <div class="sidebar-footer">
+      <button class="btn-logout" onclick="doLogout()"><i class="fas fa-sign-out-alt me-1"></i>Cerrar Sesión</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main-content">
+    <div class="topbar">
+      <div class="topbar-left">
+        <button class="btn-menu" onclick="openSidebar()"><i class="fas fa-bars"></i></button>
+        <div>
+          <h5 id="topbarTitle">Dashboard</h5>
+          <div class="date-badge" id="topbarDate"></div>
+        </div>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge-dn badge-info" id="topbarRole"></span>
+        <button class="btn-sm-icon" onclick="showSection('alertas')"><i class="fas fa-bell"></i><span id="alertDot" class="notification-dot" style="display:none"></span></button>
+      </div>
+    </div>
+
+    <div class="page-content">
+      <!-- DASHBOARD -->
+      <div id="sec-dashboard" class="section-page">
+        <div class="row g-2 mb-3" id="dashStats"></div>
+        <div class="row g-3">
+          <div class="col-lg-7">
+            <div class="panel">
+              <div class="panel-header"><h6><i class="fas fa-chart-bar me-2 text-primary"></i>Consumo por Categoría</h6></div>
+              <div class="panel-body"><canvas id="chartConsumo" height="180"></canvas></div>
+            </div>
+          </div>
+          <div class="col-lg-5 mt-3 mt-lg-0">
+            <div class="panel">
+              <div class="panel-header"><h6><i class="fas fa-clock me-2 text-warning"></i>Actividad Reciente</h6></div>
+              <div class="panel-body" id="feedActividad"></div>
+            </div>
+          </div>
+        </div>
+        <div class="row g-3 mt-0">
+          <div class="col-lg-6 mt-3">
+            <div class="panel">
+              <div class="panel-header"><h6><i class="fas fa-exclamation-triangle me-2 text-danger"></i>Stock Bajo</h6></div>
+              <div class="panel-body" id="dashStockBajo"></div>
+            </div>
+          </div>
+          <div class="col-lg-6 mt-3">
+            <div class="panel">
+              <div class="panel-header"><h6><i class="fas fa-tasks me-2 text-success"></i>Tareas Recientes</h6></div>
+              <div class="panel-body" id="dashTareasRecientes"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- INVENTARIO -->
+      <div id="sec-inventario" class="section-page">
+        <div class="panel">
+          <div class="panel-header">
+            <h6><i class="fas fa-boxes-stacked me-2"></i>Inventario</h6>
+            <div class="d-flex gap-2 flex-wrap">
+              <div class="search-box"><i class="fas fa-search"></i><input id="invSearch" type="text" class="form-control" style="width:160px" placeholder="Buscar..." oninput="renderInventario()"></div>
+              <select id="invFiltCat" class="form-select" style="width:130px" onchange="renderInventario()">
+                <option value="">Todas</option>
+                <option value="ftth">FTTH</option><option value="equipos">Equipos</option>
+                <option value="herramientas">Herramientas</option><option value="consumibles">Consumibles</option>
+              </select>
+              <button class="btn-primary-dn" id="btnNuevoItem" onclick="openModalItem()"><i class="fas fa-plus me-1"></i>Nuevo</button>
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <table class="table-dn">
+              <thead><tr><th>Código</th><th>Material</th><th>Cat.</th><th>Unidad</th><th>Stock</th><th>Mín</th><th>Estado</th><th></th></tr></thead>
+              <tbody id="invBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ASIGNAR MATERIAL -->
+      <div id="sec-asignar" class="section-page">
+        <div class="row g-3">
+          <div class="col-lg-5">
+            <div class="panel">
+              <div class="panel-header"><h6><i class="fas fa-hand-holding-box me-2"></i>Nueva Asignación</h6></div>
+              <div class="panel-body">
+                <div class="mb-3"><label class="form-label">Técnico</label><select id="asigTecnico" class="form-select"></select></div>
+                <div class="mb-3"><label class="form-label">Tarea asociada (opcional)</label><select id="asigTarea" class="form-select"><option value="">Sin tarea</option></select></div>
+                <div class="mb-3"><label class="form-label">Material</label><select id="asigMaterial" class="form-select" onchange="asigActualizarStock()"></select></div>
+                <div class="mb-3"><label class="form-label">Cantidad <span class="text-muted" id="asigStockDisp" style="font-size:.75rem"></span></label><input id="asigCantidad" type="number" min="1" class="form-control" placeholder="0" inputmode="numeric"></div>
+                <div class="mb-3"><label class="form-label">Observación</label><textarea id="asigObs" class="form-control" rows="2" placeholder="Opcional..."></textarea></div>
+                <button class="btn-primary-dn w-100" onclick="registrarAsignacion()"><i class="fas fa-check me-1"></i>Registrar Asignación</button>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-7 mt-3 mt-lg-0">
+            <div class="panel">
+              <div class="panel-header">
+                <h6><i class="fas fa-history me-2"></i>Historial</h6>
+                <select id="asigFiltTec" class="form-select" style="width:150px" onchange="renderAsignaciones()"><option value="">Todos</option></select>
+              </div>
+              <div class="table-wrapper">
+                <table class="table-dn"><thead><tr><th>Fecha</th><th>Técnico</th><th>Material</th><th>Cant.</th><th>Estado</th></tr></thead><tbody id="asigBody"></tbody></table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DESCARGO -->
+      <div id="sec-descargo" class="section-page">
+        <div class="row g-3">
+          <div class="col-lg-5">
+            <div class="panel">
+              <div class="panel-header"><h6><i class="fas fa-clipboard-check me-2"></i>Registrar Descargo</h6></div>
+              <div class="panel-body">
+                <div class="mb-3"><label class="form-label">Técnico</label><select id="descTecnico" class="form-select" onchange="descCargarAsignaciones()"></select></div>
+                <div class="mb-3"><label class="form-label">Asignación a descargar</label><select id="descAsignacion" class="form-select" onchange="descSetMax()"></select></div>
+                <div class="mb-3">
+                  <label class="form-label">Tipo de descargo</label>
+                  <div class="d-flex gap-3 flex-wrap">
+                    <label style="font-size:.85rem;cursor:pointer"><input type="radio" name="tipoDescargo" value="uso" checked> Uso en obra</label>
+                    <label style="font-size:.85rem;cursor:pointer"><input type="radio" name="tipoDescargo" value="devolucion"> Devolución</label>
+                    <label style="font-size:.85rem;cursor:pointer"><input type="radio" name="tipoDescargo" value="perdida"> Pérdida/Daño</label>
+                  </div>
+                </div>
+                <div class="mb-3"><label class="form-label">Cantidad <span id="descMaxLbl" class="text-muted" style="font-size:.75rem"></span></label><input id="descCantidad" type="number" min="1" class="form-control" placeholder="0" inputmode="numeric"></div>
+                <div class="mb-3"><label class="form-label">Observación</label><textarea id="descObs" class="form-control" rows="2" placeholder="Detalles del trabajo..."></textarea></div>
+                <button class="btn-cyan-dn w-100" onclick="registrarDescargo()"><i class="fas fa-save me-1"></i>Registrar Descargo</button>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-7 mt-3 mt-lg-0">
+            <div class="panel">
+              <div class="panel-header">
+                <h6><i class="fas fa-list-check me-2"></i>Historial de Descargos</h6>
+                <select id="descFiltTec" class="form-select" style="width:150px" onchange="renderDescargos()"><option value="">Todos</option></select>
+              </div>
+              <div class="table-wrapper">
+                <table class="table-dn"><thead><tr><th>Fecha</th><th>Técnico</th><th>Material</th><th>Cant.</th><th>Tipo</th><th>Obs.</th></tr></thead><tbody id="descBody"></tbody></table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAREAS -->
+      <div id="sec-tareas" class="section-page">
+        <div class="row g-3">
+          <div class="col-lg-4">
+            <div class="panel">
+              <div class="panel-header"><h6><i class="fas fa-plus-circle me-2"></i>Nueva Tarea</h6></div>
+              <div class="panel-body">
+                <div class="mb-3"><label class="form-label">Tipo</label>
+                  <select id="tareasTipo" class="form-select">
+                    <option>Instalación FTTH</option><option>Mantenimiento</option><option>Reparación</option>
+                    <option>Migración</option><option>Inspección</option><option>Instalación TV</option><option>Otro</option>
+                  </select>
+                </div>
+                <div class="mb-3"><label class="form-label">Título</label><input id="tareasTitle" type="text" class="form-control" placeholder="Ej: Instalación cliente García"></div>
+                <div class="mb-3"><label class="form-label">Descripción</label><textarea id="tareasDesc" class="form-control" rows="2" placeholder="Dirección, detalles..."></textarea></div>
+                <div class="mb-3"><label class="form-label">Técnico</label><select id="tareasTecnico" class="form-select"></select></div>
+                <div class="mb-3"><label class="form-label">Prioridad</label>
+                  <select id="tareasPrioridad" class="form-select"><option value="alta">Alta</option><option value="media" selected>Media</option><option value="baja">Baja</option></select>
+                </div>
+                <div class="mb-3"><label class="form-label">Fecha</label><input id="tareasFecha" type="date" class="form-control"></div>
+                <button class="btn-primary-dn w-100" id="btnCrearTarea" onclick="crearTarea()"><i class="fas fa-plus me-1"></i>Crear Tarea</button>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-8 mt-3 mt-lg-0">
+            <div class="d-flex gap-2 mb-3 flex-wrap">
+              <button class="btn-outline-dn active" onclick="filtrTareas('todas',this)">Todas</button>
+              <button class="btn-outline-dn" onclick="filtrTareas('pendiente',this)">Pendientes</button>
+              <button class="btn-outline-dn" onclick="filtrTareas('en_progreso',this)">En Progreso</button>
+              <button class="btn-outline-dn" onclick="filtrTareas('completada',this)">Completadas</button>
+            </div>
+            <div id="tareasLista"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TÉCNICOS -->
+      <div id="sec-tecnicos" class="section-page">
+        <div class="row g-3">
+          <div class="col-lg-4">
+            <div class="panel">
+              <div class="panel-header"><h6><i class="fas fa-user-plus me-2"></i>Nuevo Técnico</h6></div>
+              <div class="panel-body">
+                <div class="mb-3"><label class="form-label">Nombre completo</label><input id="tecNombre" type="text" class="form-control"></div>
+                <div class="mb-3"><label class="form-label">Usuario</label><input id="tecUser" type="text" class="form-control" autocapitalize="none"></div>
+                <div class="mb-3"><label class="form-label">Contraseña</label><input id="tecPass" type="text" class="form-control" value="tec123"></div>
+                <div class="mb-3"><label class="form-label">Teléfono</label><input id="tecTel" type="tel" class="form-control" inputmode="tel"></div>
+                <div class="mb-3"><label class="form-label">Zona</label>
+                  <select id="tecZona" class="form-select"><option>Zona Norte</option><option>Zona Sur</option><option>Zona Centro</option><option>Zona Este</option><option>Zona Oeste</option></select>
+                </div>
+                <button class="btn-primary-dn w-100" onclick="crearTecnico()"><i class="fas fa-save me-1"></i>Guardar</button>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-8 mt-3 mt-lg-0">
+            <div class="panel">
+              <div class="panel-header"><h6><i class="fas fa-users me-2"></i>Técnicos Registrados</h6></div>
+              <div class="table-wrapper">
+                <table class="table-dn"><thead><tr><th>Nombre</th><th>Usuario</th><th>Zona</th><th>Tel</th><th>Mat. Activo</th><th>Tareas</th><th></th></tr></thead><tbody id="tecnicosBody"></tbody></table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MIS ASIGNACIONES (Técnico) -->
+      <div id="sec-mis-asignaciones" class="section-page">
+        <div class="panel">
+          <div class="panel-header"><h6><i class="fas fa-box-open me-2"></i>Mi Material Asignado</h6></div>
+          <div class="table-wrapper">
+            <table class="table-dn"><thead><tr><th>Fecha</th><th>Material</th><th>Cantidad</th><th>Pendiente</th><th>Tarea</th><th>Estado</th></tr></thead><tbody id="misAsigBody"></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- MIS TAREAS (Técnico) -->
+      <div id="sec-mis-tareas" class="section-page">
+        <div id="misTareasLista"></div>
+      </div>
+
+      <!-- REPORTES -->
+      <div id="sec-reportes" class="section-page">
+        <div class="panel mb-3">
+          <div class="panel-header">
+            <h6><i class="fas fa-chart-pie me-2"></i>Reportes de Consumo</h6>
+            <div class="d-flex gap-2 flex-wrap">
+              <select id="repTecFilt" class="form-select" style="width:150px" onchange="renderReporte()"><option value="">Todos los técnicos</option></select>
+              <select id="repCatFilt" class="form-select" style="width:140px" onchange="renderReporte()">
+                <option value="">Todas categorías</option>
+                <option value="ftth">FTTH</option><option value="equipos">Equipos</option>
+                <option value="herramientas">Herramientas</option><option value="consumibles">Consumibles</option>
+              </select>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="row g-2 mb-3" id="repStats"></div>
+            <div class="row g-3">
+              <div class="col-md-6"><canvas id="chartDescargos" height="220"></canvas></div>
+              <div class="col-md-6"><canvas id="chartPorTecnico" height="220"></canvas></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><h6><i class="fas fa-table me-2"></i>Movimientos</h6></div>
+          <div class="table-wrapper">
+            <table class="table-dn"><thead><tr><th>Fecha</th><th>Tipo</th><th>Técnico</th><th>Material</th><th>Cat.</th><th>Cant.</th><th>Obs.</th></tr></thead><tbody id="repBody"></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ALERTAS -->
+      <div id="sec-alertas" class="section-page">
+        <div class="panel">
+          <div class="panel-header"><h6><i class="fas fa-bell me-2 text-danger"></i>Alertas del Sistema</h6></div>
+          <div class="panel-body" id="alertasBody"></div>
+        </div>
+      </div>
+    </div><!-- /page-content -->
+
+    <!-- BOTTOM NAV (móvil) -->
+    <nav class="bottom-nav" id="bottomNav"></nav>
+  </div><!-- /main-content -->
+</div><!-- /appShell -->
+
+<!-- MODAL ITEM -->
+<div class="modal fade" id="modalItem" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-fullscreen-md-down">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalItemTitle">Nuevo Material</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-3 col-5"><label class="form-label">Código</label><input id="miCod" type="text" class="form-control" placeholder="FIB-001"></div>
+          <div class="col-md-9 col-7"><label class="form-label">Nombre</label><input id="miNombre" type="text" class="form-control" placeholder="Descripción"></div>
+          <div class="col-md-4 col-6"><label class="form-label">Categoría</label>
+            <select id="miCat" class="form-select"><option value="ftth">FTTH</option><option value="equipos">Equipos</option><option value="herramientas">Herramientas</option><option value="consumibles">Consumibles</option></select>
+          </div>
+          <div class="col-md-4 col-6"><label class="form-label">Unidad</label>
+            <select id="miUnidad" class="form-select"><option>metro</option><option>unidad</option><option>rollo</option><option>caja</option><option>par</option><option>bobina</option></select>
+          </div>
+          <div class="col-md-4 col-6"><label class="form-label">Stock inicial</label><input id="miStock" type="number" min="0" class="form-control" value="0" inputmode="numeric"></div>
+          <div class="col-md-4 col-6"><label class="form-label">Stock mínimo</label><input id="miMin" type="number" min="0" class="form-control" value="5" inputmode="numeric"></div>
+          <div class="col-md-4 col-6"><label class="form-label">Stock máximo</label><input id="miMax" type="number" min="0" class="form-control" value="100" inputmode="numeric"></div>
+          <div class="col-md-4 col-6"><label class="form-label">Costo unitario</label><input id="miCosto" type="number" min="0" step="0.01" class="form-control" value="0" inputmode="decimal"></div>
+          <div class="col-12"><label class="form-label">Especificación</label><textarea id="miDesc" class="form-control" rows="2" placeholder="Detalles técnicos..."></textarea></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-outline-dn" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn-primary-dn" onclick="guardarItem()"><i class="fas fa-save me-1"></i>Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TAREA DETALLE -->
+<div class="modal fade" id="modalTareaDetalle" tabindex="-1">
+  <div class="modal-dialog modal-fullscreen-sm-down">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Detalle de Tarea</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="modalTareaDetalleBody"></div>
+      <div class="modal-footer" id="modalTareaDetalleFooter"></div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:9999">
+  <div id="toastMsg" class="toast align-items-center text-white border-0" role="alert" data-bs-delay="3000">
+    <div class="d-flex">
+      <div class="toast-body" id="toastBody"></div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+<script>
+// ══════════════════════════════════════════════
+//  PWA: Service Worker + Install Prompt
+// ══════════════════════════════════════════════
+let deferredPrompt = null;
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('[SW] Registrado:', reg.scope))
+      .catch(err => console.warn('[SW] Error:', err));
+  });
+}
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  const banner = document.getElementById('installBanner');
+  if (banner && currentUser) banner.classList.add('show');
+});
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('installBanner').classList.remove('show');
+  deferredPrompt = null;
+  toast('¡App instalada! Ahora puedes usarla desde tu pantalla de inicio');
+});
+
+document.getElementById('btnInstall')?.addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  if (outcome === 'accepted') document.getElementById('installBanner').classList.remove('show');
+  deferredPrompt = null;
+});
+document.getElementById('btnDismiss')?.addEventListener('click', () => {
+  document.getElementById('installBanner').classList.remove('show');
+});
+
+// Offline/Online detection
+window.addEventListener('online',  () => document.getElementById('offlineBanner').classList.remove('show'));
+window.addEventListener('offline', () => document.getElementById('offlineBanner').classList.add('show'));
+if (!navigator.onLine) document.getElementById('offlineBanner').classList.add('show');
+
+// ══════════════════════════════════════════════
+//  DATOS Y ESTADO
+// ══════════════════════════════════════════════
+const KEY = 'dukenet_bodega';
+let DB = {};
+let currentUser = null;
+let chartConsumo, chartDescargos, chartPorTec;
+const CATEGORIAS = { ftth:'FTTH', equipos:'Equipos', herramientas:'Herramientas', consumibles:'Consumibles' };
+
+function loadDB() {
+  const raw = localStorage.getItem(KEY);
+  if (raw) { DB = JSON.parse(raw); } else { initDefaultDB(); }
+}
+function saveDB() { localStorage.setItem(KEY, JSON.stringify(DB)); }
+
+function initDefaultDB() {
+  DB = {
+    usuarios: [
+      { id:'u1', user:'admin',      pass:'admin123', nombre:'Administrador',    rol:'admin',      avatar:'A' },
+      { id:'u2', user:'bodeguero',  pass:'bod123',   nombre:'Carlos Bodega',    rol:'bodeguero',  avatar:'C' },
+      { id:'u3', user:'tecnico1',   pass:'tec123',   nombre:'Luis Ramírez',     rol:'tecnico',    avatar:'L', zona:'Zona Norte', tel:'310-111-0001' },
+      { id:'u4', user:'tecnico2',   pass:'tec123',   nombre:'Pedro Salcedo',    rol:'tecnico',    avatar:'P', zona:'Zona Sur',   tel:'310-222-0002' },
+      { id:'u5', user:'supervisor', pass:'sup123',   nombre:'María Supervisora',rol:'supervisor', avatar:'M' },
+    ],
+    materiales: [
+      { id:'m1',  cod:'FIB-001', nombre:'Cable Fibra Óptica Drop 1 Hilo',      cat:'ftth',        unidad:'metro',  stock:1200, min:200, max:3000, costo:0.45, desc:'Fibra SC/APC monomodo' },
+      { id:'m2',  cod:'FIB-002', nombre:'Cable Fibra Óptica Drop 2 Hilos',     cat:'ftth',        unidad:'metro',  stock:800,  min:150, max:2000, costo:0.75, desc:'Fibra SC/APC monomodo 2H' },
+      { id:'m3',  cod:'CON-001', nombre:'Conector SC/APC Rápido',              cat:'ftth',        unidad:'unidad', stock:340,  min:100, max:1000, costo:0.80, desc:'Conector de campo' },
+      { id:'m4',  cod:'CON-002', nombre:'Pigtail SC/APC 1.5m',                cat:'ftth',        unidad:'unidad', stock:50,   min:30,  max:200,  costo:1.20, desc:'Para empalmadora' },
+      { id:'m5',  cod:'SPL-001', nombre:'Splitter PLC 1x8 (SC/APC)',          cat:'ftth',        unidad:'unidad', stock:25,   min:10,  max:80,   costo:5.50, desc:'Plástico ABS IP54' },
+      { id:'m6',  cod:'SPL-002', nombre:'Splitter PLC 1x16 (SC/APC)',         cat:'ftth',        unidad:'unidad', stock:8,    min:5,   max:40,   costo:9.00, desc:'Cassette tipo rack' },
+      { id:'m7',  cod:'EQP-001', nombre:'ONT GPON 4 puertos (Huawei)',        cat:'equipos',     unidad:'unidad', stock:45,   min:10,  max:100,  costo:38.0, desc:'ONT FTTH WiFi dual band' },
+      { id:'m8',  cod:'EQP-002', nombre:'Decodificador TV (IPTV STB)',         cat:'equipos',     unidad:'unidad', stock:30,   min:8,   max:80,   costo:25.0, desc:'Set-top box Android' },
+      { id:'m9',  cod:'EQP-003', nombre:'Router WiFi 5 (TP-Link AC1200)',     cat:'equipos',     unidad:'unidad', stock:12,   min:5,   max:50,   costo:22.0, desc:'Doble banda 2.4/5GHz' },
+      { id:'m10', cod:'HER-001', nombre:'Fusionadora de Fibra (portátil)',     cat:'herramientas',unidad:'unidad', stock:3,    min:2,   max:6,    costo:350,  desc:'Kit completo con cleaver' },
+      { id:'m11', cod:'HER-002', nombre:'Peladora de Cable Coaxial',          cat:'herramientas',unidad:'unidad', stock:8,    min:3,   max:15,   costo:12.0, desc:'Striper ajustable' },
+      { id:'m12', cod:'CON-003', nombre:'Caja Terminal 4 puertos (NAP)',      cat:'ftth',        unidad:'unidad', stock:18,   min:5,   max:60,   costo:7.50, desc:'Resistente a intemperie' },
+      { id:'m13', cod:'CON-004', nombre:'Manga Termocontraíble',              cat:'consumibles', unidad:'unidad', stock:200,  min:50,  max:500,  costo:0.30, desc:'60mm longitud' },
+      { id:'m14', cod:'CON-005', nombre:'Abrazadera plástica 20cm',           cat:'consumibles', unidad:'caja',   stock:40,   min:10,  max:100,  costo:2.50, desc:'Paq. x100 unidades' },
+      { id:'m15', cod:'CON-006', nombre:'Cinta autofundente 3M Scotch 23',    cat:'consumibles', unidad:'rollo',  stock:25,   min:8,   max:60,   costo:3.20, desc:'Cinta aislante autofundente' },
+      { id:'m16', cod:'SPL-003', nombre:'Splitter PLC 1x4 (SC/APC)',         cat:'ftth',        unidad:'unidad', stock:4,    min:5,   max:30,   costo:3.80, desc:'Micro tipo caja' },
+    ],
+    asignaciones: [
+      { id:'a1', fecha:'2026-06-20', tecId:'u3', matId:'m1', cantidad:150, pendiente:80, tareaId:'t1', obs:'Instalación sector norte', estado:'parcial' },
+      { id:'a2', fecha:'2026-06-21', tecId:'u3', matId:'m3', cantidad:10,  pendiente:10, tareaId:'t1', obs:'', estado:'pendiente' },
+      { id:'a3', fecha:'2026-06-22', tecId:'u4', matId:'m7', cantidad:2,   pendiente:2,  tareaId:'t2', obs:'ONT para instalaciones', estado:'pendiente' },
+      { id:'a4', fecha:'2026-06-23', tecId:'u4', matId:'m1', cantidad:100, pendiente:0,  tareaId:'t2', obs:'', estado:'descargado' },
+      { id:'a5', fecha:'2026-06-25', tecId:'u3', matId:'m8', cantidad:1,   pendiente:1,  tareaId:'',  obs:'STB cliente Pérez', estado:'pendiente' },
+    ],
+    descargos: [
+      { id:'d1', fecha:'2026-06-22', tecId:'u3', matId:'m1', asigId:'a1', cantidad:70,  tipo:'uso',  obs:'Tendido 70m cliente García Zona Norte' },
+      { id:'d2', fecha:'2026-06-24', tecId:'u4', matId:'m1', asigId:'a4', cantidad:100, tipo:'uso',  obs:'Instalación Bloque 4 Zona Sur' },
+    ],
+    tareas: [
+      { id:'t1', tipo:'Instalación FTTH', titulo:'Inst. Luis Martínez - Zona Norte', desc:'Calle 12 #45 apto 302. Requiere tendido 80m fibra.', tecId:'u3', prioridad:'alta',  fecha:'2026-06-21', estado:'en_progreso' },
+      { id:'t2', tipo:'Instalación FTTH', titulo:'Inst. Bloque Las Palmas',           desc:'4 clientes nuevos Bloque Las Palmas Zona Sur.',       tecId:'u4', prioridad:'media', fecha:'2026-06-22', estado:'completada'  },
+      { id:'t3', tipo:'Mantenimiento',    titulo:'Revisión OLT Nodo Norte 01',        desc:'Revisar señal y limpieza puertos ODF.',               tecId:'u3', prioridad:'alta',  fecha:'2026-06-29', estado:'pendiente'   },
+      { id:'t4', tipo:'Instalación TV',   titulo:'Inst. IPTV cliente Rodríguez',      desc:'Configurar STB y verificar canales básicos.',         tecId:'u4', prioridad:'baja',  fecha:'2026-06-30', estado:'pendiente'   },
+    ],
+    actividad: [
+      { ts:'2026-06-25 14:30', tipo:'asignacion', msg:'100m fibra asignados a Luis Ramírez',     icon:'hand-holding-box',    color:'blue' },
+      { ts:'2026-06-24 11:15', tipo:'descargo',   msg:'Pedro Salcedo descargó 100m fibra (uso)', icon:'clipboard-check',     color:'green' },
+      { ts:'2026-06-23 09:00', tipo:'tarea',      msg:'Tarea "Bloque Las Palmas" completada',    icon:'check-circle',        color:'cyan' },
+      { ts:'2026-06-22 16:45', tipo:'stock',      msg:'Stock mínimo: Splitter 1x4 (4 uds)',      icon:'exclamation-triangle',color:'orange' },
+      { ts:'2026-06-21 10:00', tipo:'asignacion', msg:'ONT asignados a Pedro Salcedo',           icon:'hand-holding-box',    color:'blue' },
+    ]
+  };
+  saveDB();
+}
+
+// ══════════════════════════════════════════════
+//  AUTH
+// ══════════════════════════════════════════════
+function fillDemo(u, p) {
+  document.getElementById('loginUser').value = u;
+  document.getElementById('loginPass').value = p;
+  document.getElementById('loginUser').focus();
+}
+function doLogin() {
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value;
+  const user = DB.usuarios.find(x => x.user === u && x.pass === p);
+  if (!user) {
+    document.getElementById('loginAlert').innerHTML = '<div class="alert-dn alert-danger"><i class="fas fa-times-circle"></i> Usuario o contraseña incorrectos.</div>';
+    return;
+  }
+  currentUser = user;
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appShell').style.display = 'block';
+  if (deferredPrompt) document.getElementById('installBanner').classList.add('show');
+  initApp();
+}
+function doLogout() {
+  currentUser = null;
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('appShell').style.display = 'none';
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+  document.getElementById('loginAlert').innerHTML = '';
+  document.getElementById('installBanner').classList.remove('show');
+  closeSidebar();
+  destroyCharts();
+}
+
+// ══════════════════════════════════════════════
+//  SIDEBAR MÓVIL
+// ══════════════════════════════════════════════
+function openSidebar() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebarOverlay').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+// ══════════════════════════════════════════════
+//  INIT APP
+// ══════════════════════════════════════════════
+function initApp() {
+  document.getElementById('sidebarName').textContent = currentUser.nombre;
+  document.getElementById('sidebarAvatar').textContent = currentUser.avatar || currentUser.nombre[0].toUpperCase();
+  const rolLabels = { admin:'Administrador', bodeguero:'Bodeguero', tecnico:'Técnico', supervisor:'Supervisor' };
+  document.getElementById('sidebarRole').textContent = rolLabels[currentUser.rol] || currentUser.rol;
+  document.getElementById('topbarRole').textContent = rolLabels[currentUser.rol] || currentUser.rol;
+  const now = new Date();
+  document.getElementById('topbarDate').textContent = now.toLocaleDateString('es-CO', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  buildSidebar();
+  buildBottomNav();
+  const defaultSec = currentUser.rol === 'tecnico' ? 'mis-tareas' : 'dashboard';
+  showSection(defaultSec);
+  checkAlertas();
+}
+
+function buildSidebar() {
+  const rol = currentUser.rol;
+  let html = '';
+  if (['admin','bodeguero','supervisor'].includes(rol)) {
+    html += `<div class="nav-section">General</div>
+    <a class="nav-item-link" onclick="showSection('dashboard');closeSidebar()" data-sec="dashboard"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>`;
+  }
+  if (rol === 'tecnico') {
+    html += `<div class="nav-section">Mi Trabajo</div>
+    <a class="nav-item-link" onclick="showSection('mis-tareas');closeSidebar()" data-sec="mis-tareas"><i class="fas fa-tasks"></i><span>Mis Tareas</span></a>
+    <a class="nav-item-link" onclick="showSection('mis-asignaciones');closeSidebar()" data-sec="mis-asignaciones"><i class="fas fa-box-open"></i><span>Mi Material</span></a>
+    <a class="nav-item-link" onclick="showSection('descargo');closeSidebar()" data-sec="descargo"><i class="fas fa-clipboard-check"></i><span>Registrar Descargo</span></a>`;
+  }
+  if (['admin','bodeguero'].includes(rol)) {
+    html += `<div class="nav-section">Bodega</div>
+    <a class="nav-item-link" onclick="showSection('inventario');closeSidebar()" data-sec="inventario"><i class="fas fa-boxes-stacked"></i><span>Inventario</span></a>
+    <a class="nav-item-link" onclick="showSection('asignar');closeSidebar()" data-sec="asignar"><i class="fas fa-hand-holding-box"></i><span>Asignar Material</span></a>
+    <a class="nav-item-link" onclick="showSection('descargo');closeSidebar()" data-sec="descargo"><i class="fas fa-clipboard-check"></i><span>Descargo</span></a>`;
+  }
+  if (['admin','bodeguero','supervisor'].includes(rol)) {
+    html += `<div class="nav-section">Operaciones</div>
+    <a class="nav-item-link" onclick="showSection('tareas');closeSidebar()" data-sec="tareas"><i class="fas fa-tasks"></i><span>Tareas</span></a>
+    <a class="nav-item-link" onclick="showSection('tecnicos');closeSidebar()" data-sec="tecnicos"><i class="fas fa-users"></i><span>Técnicos</span></a>
+    <a class="nav-item-link" onclick="showSection('reportes');closeSidebar()" data-sec="reportes"><i class="fas fa-chart-bar"></i><span>Reportes</span></a>`;
+  }
+  html += `<div class="nav-section">Sistema</div>
+  <a class="nav-item-link" onclick="showSection('alertas');closeSidebar()" data-sec="alertas"><i class="fas fa-bell"></i><span>Alertas</span></a>`;
+  document.getElementById('sidebarNav').innerHTML = html;
+}
+
+function buildBottomNav() {
+  const rol = currentUser.rol;
+  let items = [];
+  if (rol === 'tecnico') {
+    items = [
+      { sec:'mis-tareas',       icon:'tasks',           label:'Tareas' },
+      { sec:'mis-asignaciones', icon:'box-open',        label:'Material' },
+      { sec:'descargo',         icon:'clipboard-check', label:'Descargo' },
+      { sec:'alertas',          icon:'bell',            label:'Alertas' },
+    ];
+  } else {
+    items = [
+      { sec:'dashboard',  icon:'tachometer-alt',  label:'Inicio' },
+      { sec:'inventario', icon:'boxes-stacked',    label:'Bodega' },
+      { sec:'tareas',     icon:'tasks',            label:'Tareas' },
+      { sec:'asignar',    icon:'hand-holding-box', label:'Asignar' },
+      { sec:'reportes',   icon:'chart-bar',        label:'Reportes' },
+    ];
+  }
+  document.getElementById('bottomNav').innerHTML = `<div class="bottom-nav-inner">${
+    items.map(i => `<button class="bn-item" data-bn="${i.sec}" onclick="showSection('${i.sec}')">
+      <i class="fas fa-${i.icon}"></i><span>${i.label}</span></button>`).join('')
+  }</div>`;
+}
+
+// ══════════════════════════════════════════════
+//  NAVEGACIÓN
+// ══════════════════════════════════════════════
+const sectionTitles = {
+  'dashboard':'Dashboard','inventario':'Inventario','asignar':'Asignar Material',
+  'descargo':'Descargo','tareas':'Tareas','tecnicos':'Técnicos',
+  'mis-tareas':'Mis Tareas','mis-asignaciones':'Mi Material',
+  'reportes':'Reportes','alertas':'Alertas'
+};
+
+function showSection(sec) {
+  document.querySelectorAll('.section-page').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-item-link').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.bn-item').forEach(el => el.classList.remove('active'));
+  const el = document.getElementById('sec-'+sec);
+  if (el) el.classList.add('active');
+  const link = document.querySelector(`[data-sec="${sec}"]`);
+  if (link) link.classList.add('active');
+  const bnItem = document.querySelector(`[data-bn="${sec}"]`);
+  if (bnItem) bnItem.classList.add('active');
+  document.getElementById('topbarTitle').textContent = sectionTitles[sec] || sec;
+  destroyCharts();
+  const renders = {
+    'dashboard':         renderDashboard,
+    'inventario':        renderInventario,
+    'asignar':           () => { populateAsignar(); renderAsignaciones(); },
+    'descargo':          () => { populateDescargo(); renderDescargos(); },
+    'tareas':            () => { populateTareas(); renderTareas('todas'); },
+    'tecnicos':          renderTecnicos,
+    'mis-tareas':        renderMisTareas,
+    'mis-asignaciones':  renderMisAsignaciones,
+    'reportes':          () => { populateReportes(); renderReporte(); },
+    'alertas':           renderAlertas,
+  };
+  if (renders[sec]) renders[sec]();
+  window.scrollTo(0,0);
+}
+
+// ══════════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════════
+function getTecnicos()     { return DB.usuarios.filter(u => u.rol === 'tecnico'); }
+function getMaterial(id)   { return DB.materiales.find(m => m.id === id); }
+function getTecnico(id)    { return DB.usuarios.find(u => u.id === id); }
+function getTarea(id)      { return DB.tareas.find(t => t.id === id); }
+function uid()             { return 'x' + Date.now() + Math.random().toString(36).slice(2,6); }
+function fmtFecha(f)       { if (!f) return '—'; return new Date(f+'T00:00').toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'}); }
+function stockColor(m)     { return m.stock<=m.min?'#ef5350':m.stock<=m.min*1.5?'#ff9800':'#66bb6a'; }
+function stockPct(m)       { return Math.min(100, Math.round(m.stock/(m.max||1)*100)); }
+
+function toast(msg, tipo='success') {
+  const t = document.getElementById('toastMsg');
+  const b = document.getElementById('toastBody');
+  t.className = `toast align-items-center text-white border-0 bg-${tipo==='success'?'success':tipo==='danger'?'danger':tipo==='warning'?'warning':'primary'}`;
+  b.textContent = msg;
+  bootstrap.Toast.getOrCreateInstance(t).show();
+}
+function addActividad(tipo, msg, icon, color) {
+  DB.actividad.unshift({ ts:new Date().toISOString().slice(0,16).replace('T',' '), tipo, msg, icon, color });
+  if (DB.actividad.length > 30) DB.actividad.pop();
+}
+function prioridadBadge(p) {
+  const map = { alta:'badge-danger', media:'badge-warn', baja:'badge-info' };
+  return `<span class="badge-dn ${map[p]||'badge-gray'}">${p||''}</span>`;
+}
+function estadoBadge(e) {
+  const map = { pendiente:'badge-warn',en_progreso:'badge-cyan',completada:'badge-ok',cancelada:'badge-gray',parcial:'badge-purple',descargado:'badge-ok' };
+  const labels = { pendiente:'Pendiente',en_progreso:'En Progreso',completada:'Completada',cancelada:'Cancelada',parcial:'Parcial',descargado:'Descargado' };
+  return `<span class="badge-dn ${map[e]||'badge-gray'}">${labels[e]||e}</span>`;
+}
+function destroyCharts() {
+  [chartConsumo, chartDescargos, chartPorTec].forEach(c => { if (c) c.destroy(); });
+  chartConsumo = chartDescargos = chartPorTec = null;
+}
+function checkAlertas() {
+  const low = DB.materiales.filter(m => m.stock <= m.min);
+  document.getElementById('alertDot').style.display = low.length ? 'inline-block' : 'none';
+}
+
+// ══════════════════════════════════════════════
+//  DASHBOARD
+// ══════════════════════════════════════════════
+function renderDashboard() {
+  const tecCnt     = getTecnicos().length;
+  const stockBajo  = DB.materiales.filter(m => m.stock <= m.min).length;
+  const tareasPend = DB.tareas.filter(t => t.estado==='pendiente').length;
+  const tareasEP   = DB.tareas.filter(t => t.estado==='en_progreso').length;
+  const asigPend   = DB.asignaciones.filter(a => a.estado!=='descargado').length;
+
+  document.getElementById('dashStats').innerHTML = `
+    <div class="col-6 col-md-4 col-lg-2"><div class="stat-card"><div class="stat-icon blue"><i class="fas fa-boxes-stacked"></i></div><div><div class="stat-val">${DB.materiales.length}</div><div class="stat-lbl">Items Bodega</div></div></div></div>
+    <div class="col-6 col-md-4 col-lg-2"><div class="stat-card"><div class="stat-icon orange"><i class="fas fa-exclamation-triangle"></i></div><div><div class="stat-val">${stockBajo}</div><div class="stat-lbl">Stock Bajo</div></div></div></div>
+    <div class="col-6 col-md-4 col-lg-2"><div class="stat-card"><div class="stat-icon cyan"><i class="fas fa-hard-hat"></i></div><div><div class="stat-val">${tecCnt}</div><div class="stat-lbl">Técnicos</div></div></div></div>
+    <div class="col-6 col-md-4 col-lg-2"><div class="stat-card"><div class="stat-icon purple"><i class="fas fa-tasks"></i></div><div><div class="stat-val">${tareasPend}</div><div class="stat-lbl">Pend.</div></div></div></div>
+    <div class="col-6 col-md-4 col-lg-2"><div class="stat-card"><div class="stat-icon green"><i class="fas fa-spinner"></i></div><div><div class="stat-val">${tareasEP}</div><div class="stat-lbl">En Prog.</div></div></div></div>
+    <div class="col-6 col-md-4 col-lg-2"><div class="stat-card"><div class="stat-icon blue"><i class="fas fa-hand-holding-box"></i></div><div><div class="stat-val">${asigPend}</div><div class="stat-lbl">Asig. Activas</div></div></div></div>
+  `;
+
+  const colorMap = { blue:'#1565c0',green:'#2e7d32',cyan:'#00838f',orange:'#e65100',red:'#c62828' };
+  document.getElementById('feedActividad').innerHTML = DB.actividad.slice(0,8).map(a=>`
+    <div class="activity-item">
+      <div class="activity-dot" style="background:${colorMap[a.color]||'#1565c0'}15;color:${colorMap[a.color]||'#1565c0'}">
+        <i class="fas fa-${a.icon}"></i></div>
+      <div><div class="activity-text">${a.msg}</div><div class="activity-time"><i class="far fa-clock me-1"></i>${a.ts}</div></div>
+    </div>`).join('');
+
+  const bajo = DB.materiales.filter(m => m.stock <= m.min*1.5);
+  document.getElementById('dashStockBajo').innerHTML = bajo.length ? bajo.slice(0,6).map(m=>`
+    <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom">
+      <div><div style="font-size:.85rem;font-weight:600">${m.nombre}</div><div style="font-size:.73rem;color:var(--dn-muted)">${m.cod}</div></div>
+      <div class="text-end"><span class="badge-dn ${m.stock<=m.min?'badge-danger':'badge-warn'}">${m.stock} ${m.unidad}</span>
+      <div class="stock-bar mt-1"><div class="stock-fill" style="width:${stockPct(m)}%;background:${stockColor(m)}"></div></div></div>
+    </div>`).join('') : '<div class="empty-state"><i class="fas fa-check-circle text-success"></i>Stock en buen nivel</div>';
+
+  document.getElementById('dashTareasRecientes').innerHTML = DB.tareas.slice(0,5).map(t=>{
+    const tec=getTecnico(t.tecId);
+    return `<div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom">
+      <div><div style="font-size:.85rem;font-weight:600">${t.titulo}</div><div style="font-size:.73rem;color:var(--dn-muted)"><i class="fas fa-hard-hat me-1"></i>${tec?.nombre||'—'}</div></div>
+      ${estadoBadge(t.estado)}</div>`;
+  }).join('');
+
+  const cats = Object.keys(CATEGORIAS);
+  const cntByCat = cats.map(c => DB.descargos.filter(d=>{const m=getMaterial(d.matId);return m&&m.cat===c;}).reduce((s,d)=>s+d.cantidad,0));
+  const ctx = document.getElementById('chartConsumo');
+  if (ctx) chartConsumo = new Chart(ctx,{
+    type:'bar',
+    data:{ labels:cats.map(c=>CATEGORIAS[c]), datasets:[{ label:'Unidades consumidas',data:cntByCat,backgroundColor:['#0d47a1','#7b1fa2','#e65100','#2e7d32'],borderRadius:6 }] },
+    options:{ responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}} }
+  });
+}
+
+// ══════════════════════════════════════════════
+//  INVENTARIO
+// ══════════════════════════════════════════════
+function renderInventario() {
+  const q = document.getElementById('invSearch').value.toLowerCase();
+  const catF = document.getElementById('invFiltCat').value;
+  const canEdit = ['admin','bodeguero'].includes(currentUser.rol);
+  document.getElementById('btnNuevoItem').style.display = canEdit?'':'none';
+  const items = DB.materiales.filter(m=>(!q||m.nombre.toLowerCase().includes(q)||m.cod.toLowerCase().includes(q))&&(!catF||m.cat===catF));
+  document.getElementById('invBody').innerHTML = items.length ? items.map(m=>{
+    const pct=stockPct(m); const sc=stockColor(m);
+    return `<tr>
+      <td><code style="font-size:.8rem">${m.cod}</code></td>
+      <td><div style="font-weight:600;font-size:.85rem">${m.nombre}</div>${m.desc?`<div style="font-size:.72rem;color:var(--dn-muted)">${m.desc}</div>`:''}</td>
+      <td><span class="chip-category ${m.cat}">${CATEGORIAS[m.cat]||m.cat}</span></td>
+      <td style="font-size:.82rem">${m.unidad}</td>
+      <td><div style="font-weight:700;color:${sc}">${m.stock}</div><div class="stock-bar mt-1"><div class="stock-fill" style="width:${pct}%;background:${sc}"></div></div></td>
+      <td style="color:var(--dn-muted);font-size:.82rem">${m.min}</td>
+      <td>${m.stock<=m.min?'<span class="badge-dn badge-danger">Bajo</span>':m.stock<=m.min*1.5?'<span class="badge-dn badge-warn">Alerta</span>':'<span class="badge-dn badge-ok">OK</span>'}</td>
+      <td>${canEdit?`<button class="btn-sm-icon text-primary" onclick="editItem('${m.id}')"><i class="fas fa-edit"></i></button>
+        <button class="btn-sm-icon text-success" onclick="ajustarStock('${m.id}')"><i class="fas fa-plus-minus"></i></button>`:''}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="8"><div class="empty-state"><i class="fas fa-search"></i>Sin resultados</div></td></tr>';
+}
+
+let editingItemId = null;
+function openModalItem(id) {
+  editingItemId = id||null;
+  const m = id?getMaterial(id):null;
+  document.getElementById('modalItemTitle').textContent = m?'Editar Material':'Nuevo Material';
+  const keys = {miCod:'cod',miNombre:'nombre',miCat:'cat',miUnidad:'unidad',miStock:'stock',miMin:'min',miMax:'max',miCosto:'costo',miDesc:'desc'};
+  Object.entries(keys).forEach(([fId,key])=>{
+    const el=document.getElementById(fId);
+    if(m&&m[key]!==undefined) el.value=m[key]; else el.value=fId==='miMin'?5:fId==='miMax'?100:fId==='miStock'?0:'';
+  });
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('modalItem')).show();
+}
+function editItem(id) { openModalItem(id); }
+function ajustarStock(id) {
+  const m=getMaterial(id);
+  const qty=prompt(`Ajustar stock de "${m.nombre}"\nActual: ${m.stock} ${m.unidad}\n\nIngresa cantidad (+/-): `);
+  if(qty===null) return;
+  const n=parseInt(qty);
+  if(isNaN(n)) { toast('Cantidad inválida','danger'); return; }
+  m.stock=Math.max(0,m.stock+n);
+  addActividad('stock',`Ajuste stock: ${m.nombre} → ${m.stock} ${m.unidad}`,'box','blue');
+  saveDB(); renderInventario(); checkAlertas();
+  toast(`Stock ajustado: ${m.nombre} → ${m.stock} ${m.unidad}`);
+}
+function guardarItem() {
+  const cod=document.getElementById('miCod').value.trim();
+  const nombre=document.getElementById('miNombre').value.trim();
+  if(!cod||!nombre){toast('Código y nombre son obligatorios','danger');return;}
+  if(editingItemId) {
+    const m=getMaterial(editingItemId);
+    Object.assign(m,{cod,nombre,cat:document.getElementById('miCat').value,unidad:document.getElementById('miUnidad').value,
+      stock:+document.getElementById('miStock').value,min:+document.getElementById('miMin').value,
+      max:+document.getElementById('miMax').value,costo:+document.getElementById('miCosto').value,
+      desc:document.getElementById('miDesc').value});
+  } else {
+    DB.materiales.push({id:uid(),cod,nombre,cat:document.getElementById('miCat').value,unidad:document.getElementById('miUnidad').value,
+      stock:+document.getElementById('miStock').value,min:+document.getElementById('miMin').value,
+      max:+document.getElementById('miMax').value,costo:+document.getElementById('miCosto').value,
+      desc:document.getElementById('miDesc').value});
+    addActividad('inventario',`Nuevo material: ${nombre}`,'box','blue');
+  }
+  saveDB();
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('modalItem')).hide();
+  renderInventario(); checkAlertas();
+  toast(editingItemId?'Material actualizado':'Material registrado');
+}
+
+// ══════════════════════════════════════════════
+//  ASIGNAR
+// ══════════════════════════════════════════════
+function populateAsignar() {
+  const tecs=getTecnicos();
+  document.getElementById('asigTecnico').innerHTML=tecs.map(t=>`<option value="${t.id}">${t.nombre}</option>`).join('');
+  document.getElementById('asigMaterial').innerHTML=DB.materiales.map(m=>`<option value="${m.id}">${m.cod} – ${m.nombre} (${m.stock} ${m.unidad})</option>`).join('');
+  document.getElementById('asigTarea').innerHTML='<option value="">Sin tarea</option>'+DB.tareas.filter(t=>t.estado!=='completada').map(t=>`<option value="${t.id}">${t.titulo}</option>`).join('');
+  document.getElementById('asigFiltTec').innerHTML='<option value="">Todos</option>'+tecs.map(t=>`<option value="${t.id}">${t.nombre}</option>`).join('');
+  asigActualizarStock();
+}
+function asigActualizarStock() {
+  const m=getMaterial(document.getElementById('asigMaterial').value);
+  document.getElementById('asigStockDisp').textContent=m?`(Disponible: ${m.stock} ${m.unidad})`:'';
+}
+function registrarAsignacion() {
+  const tecId=document.getElementById('asigTecnico').value;
+  const matId=document.getElementById('asigMaterial').value;
+  const cant=+document.getElementById('asigCantidad').value;
+  const tareaId=document.getElementById('asigTarea').value;
+  const obs=document.getElementById('asigObs').value;
+  if(!tecId||!matId||!cant||cant<=0){toast('Completa todos los campos','danger');return;}
+  const m=getMaterial(matId);
+  if(m.stock<cant){toast(`Stock insuficiente. Disponible: ${m.stock} ${m.unidad}`,'danger');return;}
+  m.stock-=cant;
+  DB.asignaciones.push({id:uid(),fecha:new Date().toISOString().slice(0,10),tecId,matId,cantidad:cant,pendiente:cant,tareaId,obs,estado:'pendiente'});
+  addActividad('asignacion',`${cant} ${m.unidad} de ${m.nombre} → ${getTecnico(tecId)?.nombre}`,'hand-holding-box','blue');
+  saveDB(); checkAlertas();
+  document.getElementById('asigCantidad').value='';
+  document.getElementById('asigObs').value='';
+  renderAsignaciones(); asigActualizarStock();
+  toast('Asignación registrada');
+}
+function renderAsignaciones() {
+  const filtTec=document.getElementById('asigFiltTec')?.value||'';
+  const lista=[...DB.asignaciones].reverse().filter(a=>!filtTec||a.tecId===filtTec);
+  document.getElementById('asigBody').innerHTML=lista.length?lista.map(a=>{
+    const m=getMaterial(a.matId);const tec=getTecnico(a.tecId);
+    return `<tr><td>${a.fecha}</td><td>${tec?.nombre||'—'}</td>
+      <td>${m?.nombre||'—'}<br><small class="text-muted">${m?.cod||''}</small></td>
+      <td><b>${a.cantidad}</b><br><small class="text-muted">pend:${a.pendiente}</small></td>
+      <td>${estadoBadge(a.estado)}</td></tr>`;
+  }).join(''):'<tr><td colspan="5"><div class="empty-state"><i class="fas fa-inbox"></i>Sin asignaciones</div></td></tr>';
+}
+
+// ══════════════════════════════════════════════
+//  DESCARGO
+// ══════════════════════════════════════════════
+function populateDescargo() {
+  const tecs=getTecnicos();
+  const isAdmin=['admin','bodeguero'].includes(currentUser.rol);
+  const tecList=isAdmin?tecs:tecs.filter(t=>t.id===currentUser.id);
+  document.getElementById('descTecnico').innerHTML=tecList.map(t=>`<option value="${t.id}">${t.nombre}</option>`).join('');
+  if(!isAdmin&&currentUser.rol==='tecnico'){
+    document.getElementById('descTecnico').value=currentUser.id;
+    document.getElementById('descTecnico').disabled=true;
+  }
+  document.getElementById('descFiltTec').innerHTML='<option value="">Todos</option>'+tecs.map(t=>`<option value="${t.id}">${t.nombre}</option>`).join('');
+  descCargarAsignaciones();
+}
+function descCargarAsignaciones() {
+  const tecId=document.getElementById('descTecnico').value;
+  const asigs=DB.asignaciones.filter(a=>a.tecId===tecId&&a.pendiente>0);
+  document.getElementById('descAsignacion').innerHTML=asigs.length?
+    asigs.map(a=>{const m=getMaterial(a.matId);return`<option value="${a.id}">${m?.nombre||'—'} — ${a.pendiente} ${m?.unidad||''} (${a.fecha})</option>`;}).join(''):
+    '<option value="">Sin material pendiente</option>';
+  descSetMax();
+}
+function descSetMax() {
+  const asig=DB.asignaciones.find(a=>a.id===document.getElementById('descAsignacion').value);
+  document.getElementById('descMaxLbl').textContent=asig?`(máx: ${asig.pendiente})`:'';
+  if(asig) document.getElementById('descCantidad').max=asig.pendiente;
+}
+function registrarDescargo() {
+  const tecId=document.getElementById('descTecnico').value;
+  const asigId=document.getElementById('descAsignacion').value;
+  const cant=+document.getElementById('descCantidad').value;
+  const tipo=document.querySelector('input[name="tipoDescargo"]:checked').value;
+  const obs=document.getElementById('descObs').value;
+  const asig=DB.asignaciones.find(a=>a.id===asigId);
+  if(!asig||!cant||cant<=0){toast('Completa todos los campos','danger');return;}
+  if(cant>asig.pendiente){toast(`Excede el pendiente (${asig.pendiente})`,'danger');return;}
+  const m=getMaterial(asig.matId);
+  asig.pendiente-=cant;
+  asig.estado=asig.pendiente===0?'descargado':'parcial';
+  if(tipo==='devolucion'&&m) m.stock+=cant;
+  DB.descargos.push({id:uid(),fecha:new Date().toISOString().slice(0,10),tecId,matId:asig.matId,asigId,cantidad:cant,tipo,obs});
+  const tipoLabel={uso:'uso en obra',devolucion:'devolución',perdida:'pérdida/daño'};
+  addActividad('descargo',`${getTecnico(tecId)?.nombre}: ${cant} ${m?.unidad||''} ${m?.nombre||''} (${tipoLabel[tipo]})`,'clipboard-check','green');
+  saveDB(); checkAlertas();
+  document.getElementById('descCantidad').value='';
+  document.getElementById('descObs').value='';
+  descCargarAsignaciones(); renderDescargos();
+  toast('Descargo registrado');
+}
+function renderDescargos() {
+  const filtTec=document.getElementById('descFiltTec')?.value||'';
+  const lista=[...DB.descargos].reverse().filter(d=>!filtTec||d.tecId===filtTec);
+  const tipoLabel={uso:'Uso',devolucion:'Devolución',perdida:'Pérdida'};
+  document.getElementById('descBody').innerHTML=lista.length?lista.map(d=>{
+    const m=getMaterial(d.matId);const tec=getTecnico(d.tecId);
+    return `<tr><td>${d.fecha}</td><td>${tec?.nombre||'—'}</td><td>${m?.nombre||'—'}</td>
+      <td><b>${d.cantidad}</b> ${m?.unidad||''}</td>
+      <td><span class="badge-dn ${d.tipo==='uso'?'badge-info':d.tipo==='devolucion'?'badge-ok':'badge-danger'}">${tipoLabel[d.tipo]||d.tipo}</span></td>
+      <td style="font-size:.78rem;max-width:160px">${d.obs||'—'}</td></tr>`;
+  }).join(''):'<tr><td colspan="6"><div class="empty-state"><i class="fas fa-clipboard"></i>Sin descargos</div></td></tr>';
+}
+
+// ══════════════════════════════════════════════
+//  TAREAS
+// ══════════════════════════════════════════════
+function populateTareas() {
+  const tecs=getTecnicos();
+  document.getElementById('tareasTecnico').innerHTML=tecs.map(t=>`<option value="${t.id}">${t.nombre}</option>`).join('');
+  document.getElementById('tareasFecha').value=new Date().toISOString().slice(0,10);
+  document.getElementById('btnCrearTarea').style.display=['admin','bodeguero','supervisor'].includes(currentUser.rol)?'':'none';
+}
+function crearTarea() {
+  const titulo=document.getElementById('tareasTitle').value.trim();
+  const tecId=document.getElementById('tareasTecnico').value;
+  if(!titulo||!tecId){toast('Título y técnico son obligatorios','danger');return;}
+  DB.tareas.unshift({
+    id:uid(),tipo:document.getElementById('tareasTipo').value,titulo,
+    desc:document.getElementById('tareasDesc').value,tecId,
+    prioridad:document.getElementById('tareasPrioridad').value,
+    fecha:document.getElementById('tareasFecha').value,estado:'pendiente'
+  });
+  addActividad('tarea',`Nueva tarea: ${titulo} → ${getTecnico(tecId)?.nombre}`,'tasks','purple');
+  saveDB();
+  document.getElementById('tareasTitle').value='';
+  document.getElementById('tareasDesc').value='';
+  renderTareas('todas');
+  toast('Tarea creada');
+}
+let filtrTareasActual='todas';
+function filtrTareas(f,btn) {
+  filtrTareasActual=f;
+  document.querySelectorAll('#sec-tareas .btn-outline-dn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderTareas(f);
+}
+function renderTareas(f) {
+  const lista=DB.tareas.filter(t=>f==='todas'||t.estado===f);
+  const canEdit=['admin','bodeguero','supervisor'].includes(currentUser.rol);
+  document.getElementById('tareasLista').innerHTML=lista.length?lista.map(t=>{
+    const tec=getTecnico(t.tecId);
+    return `<div class="task-card ${t.estado}">
+      <div class="d-flex justify-content-between align-items-start mb-1">
+        <div><span style="font-size:.7rem;color:var(--dn-muted);text-transform:uppercase">${t.tipo}</span>
+          <div style="font-weight:700;font-size:.9rem">${t.titulo}</div></div>
+        <div class="d-flex gap-1">${prioridadBadge(t.prioridad)} ${estadoBadge(t.estado)}</div>
+      </div>
+      <div style="font-size:.8rem;color:var(--dn-muted);margin-bottom:.5rem">${t.desc}</div>
+      <div class="d-flex justify-content-between align-items-center">
+        <div style="font-size:.78rem"><i class="fas fa-hard-hat me-1 text-primary"></i>${tec?.nombre||'—'} &nbsp;|&nbsp; <i class="fas fa-calendar me-1"></i>${fmtFecha(t.fecha)}</div>
+        <div class="d-flex gap-1">
+          <button class="btn-sm-icon" onclick="verTareaDetalle('${t.id}')"><i class="fas fa-eye text-primary"></i></button>
+          ${canEdit?`<button class="btn-sm-icon" onclick="cambiarEstadoTarea('${t.id}','en_progreso')"><i class="fas fa-play text-warning"></i></button>
+          <button class="btn-sm-icon" onclick="cambiarEstadoTarea('${t.id}','completada')"><i class="fas fa-check text-success"></i></button>
+          <button class="btn-sm-icon" onclick="cambiarEstadoTarea('${t.id}','cancelada')"><i class="fas fa-times text-danger"></i></button>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join(''):'<div class="empty-state"><i class="fas fa-tasks"></i>Sin tareas en esta categoría</div>';
+}
+function cambiarEstadoTarea(id,estado) {
+  const t=getTarea(id); if(!t) return;
+  t.estado=estado;
+  addActividad('tarea',`"${t.titulo}" → ${estado.replace('_',' ')}`,'tasks',estado==='completada'?'green':estado==='cancelada'?'red':'cyan');
+  saveDB(); renderTareas(filtrTareasActual);
+  toast(`Tarea ${estado.replace('_',' ')}`);
+}
+function verTareaDetalle(id) {
+  const t=getTarea(id); if(!t) return;
+  const tec=getTecnico(t.tecId);
+  const matAsig=DB.asignaciones.filter(a=>a.tareaId===id);
+  document.getElementById('modalTareaDetalleBody').innerHTML=`
+    <div class="mb-3"><div class="d-flex gap-2 mb-1">${prioridadBadge(t.prioridad)} ${estadoBadge(t.estado)}</div>
+    <h6 class="fw-bold">${t.titulo}</h6><span class="chip-category">${t.tipo}</span></div>
+    <div class="mb-3"><div class="form-label mb-1">Descripción</div><div style="font-size:.87rem">${t.desc||'Sin descripción'}</div></div>
+    <div class="row g-2 mb-3">
+      <div class="col-6"><div class="form-label mb-0">Técnico</div><div style="font-size:.87rem;font-weight:600">${tec?.nombre||'—'}</div></div>
+      <div class="col-6"><div class="form-label mb-0">Fecha</div><div style="font-size:.87rem">${fmtFecha(t.fecha)}</div></div>
+    </div>
+    ${matAsig.length?`<div class="form-label">Material asignado</div>
+    <div class="table-wrapper"><table class="table-dn"><thead><tr><th>Material</th><th>Asignado</th><th>Pendiente</th><th>Estado</th></tr></thead><tbody>
+    ${matAsig.map(a=>{const m=getMaterial(a.matId);return`<tr><td>${m?.nombre||'—'}</td><td>${a.cantidad} ${m?.unidad||''}</td><td>${a.pendiente}</td><td>${estadoBadge(a.estado)}</td></tr>`;}).join('')}
+    </tbody></table></div>`:'<div class="text-muted" style="font-size:.85rem">Sin material asignado.</div>'}
+  `;
+  document.getElementById('modalTareaDetalleFooter').innerHTML=`
+    <button class="btn-outline-dn" data-bs-dismiss="modal">Cerrar</button>
+    ${['admin','bodeguero','supervisor'].includes(currentUser.rol)?
+    `<button class="btn-primary-dn" onclick="cambiarEstadoTarea('${t.id}','completada');bootstrap.Modal.getInstance(document.getElementById('modalTareaDetalle')).hide()"><i class="fas fa-check me-1"></i>Completar</button>`:''}
+  `;
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('modalTareaDetalle')).show();
+}
+
+// ══════════════════════════════════════════════
+//  TÉCNICOS
+// ══════════════════════════════════════════════
+function crearTecnico() {
+  const nombre=document.getElementById('tecNombre').value.trim();
+  const user=document.getElementById('tecUser').value.trim();
+  const pass=document.getElementById('tecPass').value.trim();
+  if(!nombre||!user||!pass){toast('Nombre, usuario y contraseña son obligatorios','danger');return;}
+  if(DB.usuarios.find(u=>u.user===user)){toast('Ese usuario ya existe','danger');return;}
+  DB.usuarios.push({id:uid(),user,pass,nombre,rol:'tecnico',avatar:nombre[0].toUpperCase(),tel:document.getElementById('tecTel').value,zona:document.getElementById('tecZona').value});
+  addActividad('tecnico',`Nuevo técnico: ${nombre}`,'user-plus','blue');
+  saveDB();
+  ['tecNombre','tecUser','tecTel'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('tecPass').value='tec123';
+  renderTecnicos(); toast('Técnico registrado');
+}
+function renderTecnicos() {
+  const tecs=getTecnicos();
+  document.getElementById('tecnicosBody').innerHTML=tecs.length?tecs.map(t=>{
+    const matActivo=DB.asignaciones.filter(a=>a.tecId===t.id&&a.estado!=='descargado').length;
+    const tareasT=DB.tareas.filter(x=>x.tecId===t.id&&!['completada','cancelada'].includes(x.estado)).length;
+    return `<tr>
+      <td><div style="font-weight:600;font-size:.87rem">${t.nombre}</div></td>
+      <td><code style="font-size:.8rem">${t.user}</code></td>
+      <td><span class="badge-dn badge-info" style="font-size:.7rem">${t.zona||'—'}</span></td>
+      <td style="font-size:.82rem">${t.tel||'—'}</td>
+      <td><span class="badge-dn ${matActivo>0?'badge-warn':'badge-gray'}">${matActivo}</span></td>
+      <td><span class="badge-dn ${tareasT>0?'badge-cyan':'badge-gray'}">${tareasT}</span></td>
+      <td><button class="btn-sm-icon text-danger" onclick="eliminarTecnico('${t.id}')"><i class="fas fa-trash"></i></button></td>
+    </tr>`;
+  }).join(''):'<tr><td colspan="7"><div class="empty-state"><i class="fas fa-users"></i>Sin técnicos</div></td></tr>';
+}
+function eliminarTecnico(id) {
+  if(!confirm('¿Eliminar este técnico?')) return;
+  DB.usuarios=DB.usuarios.filter(u=>u.id!==id);
+  saveDB(); renderTecnicos(); toast('Técnico eliminado','warning');
+}
+
+// ══════════════════════════════════════════════
+//  MIS TAREAS / MIS ASIGNACIONES (Técnico)
+// ══════════════════════════════════════════════
+function renderMisTareas() {
+  const lista=DB.tareas.filter(t=>t.tecId===currentUser.id);
+  document.getElementById('misTareasLista').innerHTML=lista.length?lista.map(t=>`
+    <div class="task-card ${t.estado} mb-3">
+      <div class="d-flex justify-content-between align-items-start mb-1">
+        <div><span style="font-size:.7rem;color:var(--dn-muted);text-transform:uppercase">${t.tipo}</span>
+          <div style="font-weight:700;font-size:.92rem">${t.titulo}</div></div>
+        <div class="d-flex gap-1">${prioridadBadge(t.prioridad)} ${estadoBadge(t.estado)}</div>
+      </div>
+      <div style="font-size:.82rem;color:var(--dn-muted);margin-bottom:.6rem">${t.desc}</div>
+      <div class="d-flex gap-2 align-items-center flex-wrap">
+        <span style="font-size:.78rem"><i class="fas fa-calendar me-1"></i>${fmtFecha(t.fecha)}</span>
+        ${t.estado==='pendiente'?`<button class="btn-cyan-dn" style="font-size:.78rem;padding:4px 12px" onclick="cambiarEstadoTareaT('${t.id}','en_progreso')"><i class="fas fa-play me-1"></i>Iniciar</button>`:''}
+        ${t.estado==='en_progreso'?`<button class="btn-primary-dn" style="font-size:.78rem;padding:4px 12px" onclick="cambiarEstadoTareaT('${t.id}','completada')"><i class="fas fa-check me-1"></i>Finalizar</button>`:''}
+      </div>
+    </div>`).join(''):'<div class="empty-state"><i class="fas fa-tasks"></i>No tienes tareas asignadas</div>';
+}
+function cambiarEstadoTareaT(id,estado) {
+  const t=getTarea(id); if(!t) return;
+  t.estado=estado;
+  addActividad('tarea',`${currentUser.nombre}: "${t.titulo}" → ${estado.replace('_',' ')}`,'tasks',estado==='completada'?'green':'cyan');
+  saveDB(); renderMisTareas(); toast(`Tarea ${estado.replace('_',' ')}`);
+}
+function renderMisAsignaciones() {
+  const mis=[...DB.asignaciones].reverse().filter(a=>a.tecId===currentUser.id);
+  document.getElementById('misAsigBody').innerHTML=mis.length?mis.map(a=>{
+    const m=getMaterial(a.matId);const tar=getTarea(a.tareaId);
+    return `<tr><td>${a.fecha}</td><td>${m?.nombre||'—'}<br><small>${m?.cod||''}</small></td>
+      <td><b>${a.cantidad}</b> ${m?.unidad||''}</td>
+      <td><span class="badge-dn ${a.pendiente>0?'badge-warn':'badge-gray'}">${a.pendiente}</span></td>
+      <td style="font-size:.78rem">${tar?tar.titulo:'—'}</td>
+      <td>${estadoBadge(a.estado)}</td></tr>`;
+  }).join(''):'<tr><td colspan="6"><div class="empty-state"><i class="fas fa-box-open"></i>Sin material asignado</div></td></tr>';
+}
+
+// ══════════════════════════════════════════════
+//  REPORTES
+// ══════════════════════════════════════════════
+function populateReportes() {
+  const tecs=getTecnicos();
+  document.getElementById('repTecFilt').innerHTML='<option value="">Todos los técnicos</option>'+tecs.map(t=>`<option value="${t.id}">${t.nombre}</option>`).join('');
+}
+function renderReporte() {
+  const filtTec=document.getElementById('repTecFilt').value;
+  const filtCat=document.getElementById('repCatFilt').value;
+  const desc=DB.descargos.filter(d=>{const m=getMaterial(d.matId);return(!filtTec||d.tecId===filtTec)&&(!filtCat||m?.cat===filtCat);});
+  const uso=desc.filter(d=>d.tipo==='uso').reduce((s,d)=>s+d.cantidad,0);
+  const dev=desc.filter(d=>d.tipo==='devolucion').reduce((s,d)=>s+d.cantidad,0);
+  const perd=desc.filter(d=>d.tipo==='perdida').reduce((s,d)=>s+d.cantidad,0);
+  document.getElementById('repStats').innerHTML=`
+    <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-icon blue"><i class="fas fa-list"></i></div><div><div class="stat-val">${desc.length}</div><div class="stat-lbl">Descargos</div></div></div></div>
+    <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-icon green"><i class="fas fa-tools"></i></div><div><div class="stat-val">${uso}</div><div class="stat-lbl">Usadas</div></div></div></div>
+    <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-icon cyan"><i class="fas fa-undo"></i></div><div><div class="stat-val">${dev}</div><div class="stat-lbl">Devueltas</div></div></div></div>
+    <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-icon red"><i class="fas fa-times-circle"></i></div><div><div class="stat-val">${perd}</div><div class="stat-lbl">Pérdidas</div></div></div></div>`;
+  destroyCharts();
+  const ctx1=document.getElementById('chartDescargos');
+  if(ctx1) chartDescargos=new Chart(ctx1,{type:'doughnut',data:{labels:['Uso','Devolución','Pérdida'],datasets:[{data:[uso,dev,perd],backgroundColor:['#0d47a1','#2e7d32','#c62828'],borderWidth:2}]},options:{responsive:true,plugins:{legend:{position:'bottom'},title:{display:true,text:'Tipo de Descargo'}}}});
+  const tecs=getTecnicos();
+  const cntByTec=tecs.map(t=>desc.filter(d=>d.tecId===t.id).reduce((s,d)=>s+d.cantidad,0));
+  const ctx2=document.getElementById('chartPorTecnico');
+  if(ctx2) chartPorTec=new Chart(ctx2,{type:'bar',data:{labels:tecs.map(t=>t.nombre.split(' ')[0]),datasets:[{label:'Unidades',data:cntByTec,backgroundColor:'#00bcd4',borderRadius:6}]},options:{responsive:true,plugins:{legend:{display:false},title:{display:true,text:'Consumo por Técnico'}},scales:{y:{beginAtZero:true}}}});
+  const tipoLabel={uso:'Uso',devolucion:'Dev.',perdida:'Pérdida'};
+  document.getElementById('repBody').innerHTML=[...desc].reverse().map(d=>{
+    const m=getMaterial(d.matId);const tec=getTecnico(d.tecId);
+    return `<tr><td>${d.fecha}</td>
+      <td><span class="badge-dn ${d.tipo==='uso'?'badge-info':d.tipo==='devolucion'?'badge-ok':'badge-danger'}">${tipoLabel[d.tipo]||d.tipo}</span></td>
+      <td>${tec?.nombre||'—'}</td><td>${m?.nombre||'—'}</td>
+      <td><span class="chip-category ${m?.cat||''}">${CATEGORIAS[m?.cat]||'—'}</span></td>
+      <td><b>${d.cantidad}</b> ${m?.unidad||''}</td>
+      <td style="font-size:.78rem">${d.obs||'—'}</td></tr>`;
+  }).join('')||'<tr><td colspan="7" class="text-center text-muted py-3">Sin movimientos</td></tr>';
+}
+
+// ══════════════════════════════════════════════
+//  ALERTAS
+// ══════════════════════════════════════════════
+function renderAlertas() {
+  const alertas=[];
+  DB.materiales.forEach(m=>{
+    if(m.stock<=m.min) alertas.push({tipo:'danger',icon:'exclamation-circle',msg:`<b>Stock crítico:</b> ${m.nombre} — ${m.stock} ${m.unidad} (mín. ${m.min})`});
+    else if(m.stock<=m.min*1.5) alertas.push({tipo:'warning',icon:'exclamation-triangle',msg:`<b>Stock bajo:</b> ${m.nombre} — ${m.stock} ${m.unidad}`});
+  });
+  DB.tareas.filter(t=>t.estado==='pendiente').forEach(t=>{
+    alertas.push({tipo:'info',icon:'tasks',msg:`<b>Tarea pendiente:</b> ${t.titulo} — ${getTecnico(t.tecId)?.nombre||'Sin asignar'}`});
+  });
+  document.getElementById('alertasBody').innerHTML=alertas.length?
+    alertas.map(a=>`<div class="alert-dn alert-${a.tipo}"><i class="fas fa-${a.icon} me-1"></i><div>${a.msg}</div></div>`).join(''):
+    '<div class="empty-state"><i class="fas fa-shield-alt text-success"></i>Sin alertas activas</div>';
+}
+
+// ══════════════════════════════════════════════
+//  INICIO
+// ══════════════════════════════════════════════
+loadDB();
+</script>
+</body>
+</html>
