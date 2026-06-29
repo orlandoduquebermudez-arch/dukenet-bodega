@@ -514,29 +514,53 @@
         </div>
       </div>
 
-      <!-- TÉCNICOS -->
+      <!-- USUARIOS (Técnicos + Supervisores + Bodegueros) -->
       <div id="sec-tecnicos" class="section-page">
         <div class="row g-3">
           <div class="col-lg-4">
             <div class="panel">
-              <div class="panel-header"><h6><i class="fas fa-user-plus me-2"></i>Nuevo Técnico</h6></div>
+              <div class="panel-header"><h6><i class="fas fa-user-plus me-2"></i>Nuevo Usuario</h6></div>
               <div class="panel-body">
                 <div class="mb-3"><label class="form-label">Nombre completo</label><input id="tecNombre" type="text" class="form-control"></div>
-                <div class="mb-3"><label class="form-label">Usuario</label><input id="tecUser" type="text" class="form-control" autocapitalize="none"></div>
-                <div class="mb-3"><label class="form-label">Contraseña</label><input id="tecPass" type="text" class="form-control" value="tec123"></div>
-                <div class="mb-3"><label class="form-label">Teléfono</label><input id="tecTel" type="tel" class="form-control" inputmode="tel"></div>
-                <div class="mb-3"><label class="form-label">Zona</label>
-                  <select id="tecZona" class="form-select"><option>Zona Norte</option><option>Zona Sur</option><option>Zona Centro</option><option>Zona Este</option><option>Zona Oeste</option></select>
+                <div class="mb-3"><label class="form-label">Usuario (login)</label><input id="tecUser" type="text" class="form-control" autocapitalize="none"></div>
+                <div class="mb-3"><label class="form-label">Contraseña</label><input id="tecPass" type="text" class="form-control" value="dukenet123"></div>
+                <div class="mb-3">
+                  <label class="form-label">Rol</label>
+                  <select id="tecRol" class="form-select" onchange="toggleCamposTec()">
+                    <option value="tecnico">Técnico de Campo</option>
+                    <option value="supervisor">Supervisor</option>
+                    <option value="bodeguero">Bodeguero</option>
+                  </select>
                 </div>
-                <button class="btn-primary-dn w-100" onclick="crearTecnico()"><i class="fas fa-save me-1"></i>Guardar</button>
+                <div id="camposTecnico">
+                  <div class="mb-3"><label class="form-label">Teléfono</label><input id="tecTel" type="tel" class="form-control" inputmode="tel"></div>
+                  <div class="mb-3"><label class="form-label">Zona</label>
+                    <select id="tecZona" class="form-select"><option>Zona Norte</option><option>Zona Sur</option><option>Zona Centro</option><option>Zona Este</option><option>Zona Oeste</option></select>
+                  </div>
+                </div>
+                <div class="mb-3"><label class="form-label">Email (opcional)</label><input id="tecEmail" type="email" class="form-control" placeholder="usuario@dukenet.co"></div>
+                <button class="btn-primary-dn w-100" onclick="crearTecnico()"><i class="fas fa-save me-1"></i>Guardar Usuario</button>
               </div>
             </div>
           </div>
           <div class="col-lg-8 mt-3 mt-lg-0">
             <div class="panel">
-              <div class="panel-header"><h6><i class="fas fa-users me-2"></i>Técnicos Registrados</h6></div>
+              <div class="panel-header">
+                <h6><i class="fas fa-users me-2"></i>Usuarios del Sistema</h6>
+                <div class="d-flex gap-2">
+                  <select id="filtRolUsuarios" class="form-select" style="width:160px" onchange="renderTecnicos()">
+                    <option value="">Todos los roles</option>
+                    <option value="tecnico">Técnicos</option>
+                    <option value="supervisor">Supervisores</option>
+                    <option value="bodeguero">Bodegueros</option>
+                  </select>
+                </div>
+              </div>
               <div class="table-wrapper">
-                <table class="table-dn"><thead><tr><th>Nombre</th><th>Usuario</th><th>Zona</th><th>Tel</th><th>Mat. Activo</th><th>Tareas</th><th></th></tr></thead><tbody id="tecnicosBody"></tbody></table>
+                <table class="table-dn">
+                  <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Zona / Info</th><th>Mat. Activo</th><th>Tareas</th><th></th></tr></thead>
+                  <tbody id="tecnicosBody"></tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -560,30 +584,112 @@
 
       <!-- REPORTES -->
       <div id="sec-reportes" class="section-page">
+
+        <!-- FILTROS -->
         <div class="panel mb-3">
           <div class="panel-header">
-            <h6><i class="fas fa-chart-pie me-2"></i>Reportes de Consumo</h6>
-            <div class="d-flex gap-2 flex-wrap">
-              <select id="repTecFilt" class="form-select" style="width:150px" onchange="renderReporte()"><option value="">Todos los técnicos</option></select>
-              <select id="repCatFilt" class="form-select" style="width:140px" onchange="renderReporte()">
-                <option value="">Todas categorías</option>
-                <option value="ftth">FTTH</option><option value="equipos">Equipos</option>
-                <option value="herramientas">Herramientas</option><option value="consumibles">Consumibles</option>
-              </select>
-            </div>
+            <h6><i class="fas fa-filter me-2"></i>Filtros del Informe</h6>
+            <button class="btn-cyan-dn" style="font-size:.8rem;padding:5px 12px" onclick="exportarCSV()"><i class="fas fa-file-csv me-1"></i>Exportar CSV</button>
           </div>
           <div class="panel-body">
-            <div class="row g-2 mb-3" id="repStats"></div>
-            <div class="row g-3">
-              <div class="col-md-6"><canvas id="chartDescargos" height="220"></canvas></div>
-              <div class="col-md-6"><canvas id="chartPorTecnico" height="220"></canvas></div>
+            <div class="row g-2">
+              <div class="col-6 col-md-3">
+                <label class="form-label">Fecha desde</label>
+                <input type="date" id="repFechaDesde" class="form-control" onchange="renderReporte()">
+              </div>
+              <div class="col-6 col-md-3">
+                <label class="form-label">Fecha hasta</label>
+                <input type="date" id="repFechaHasta" class="form-control" onchange="renderReporte()">
+              </div>
+              <div class="col-6 col-md-3">
+                <label class="form-label">Técnico</label>
+                <select id="repTecFilt" class="form-select" onchange="renderReporte()"><option value="">Todos</option></select>
+              </div>
+              <div class="col-6 col-md-3">
+                <label class="form-label">Categoría</label>
+                <select id="repCatFilt" class="form-select" onchange="renderReporte()">
+                  <option value="">Todas</option>
+                  <option value="ftth">FTTH</option><option value="equipos">Equipos</option>
+                  <option value="herramientas">Herramientas</option><option value="consumibles">Consumibles</option>
+                </select>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Tipo de movimiento</label>
+                <div class="d-flex gap-3">
+                  <label style="font-size:.85rem;cursor:pointer"><input type="checkbox" id="repFiltUso" checked onchange="renderReporte()"> Uso en obra</label>
+                  <label style="font-size:.85rem;cursor:pointer"><input type="checkbox" id="repFiltDev" checked onchange="renderReporte()"> Devoluciones</label>
+                  <label style="font-size:.85rem;cursor:pointer"><input type="checkbox" id="repFiltPerd" checked onchange="renderReporte()"> Pérdidas</label>
+                </div>
+              </div>
+              <div class="col-12 col-md-6 d-flex align-items-end gap-2">
+                <button class="btn-outline-dn" onclick="setRangoRapido('mes')"><i class="fas fa-calendar me-1"></i>Este mes</button>
+                <button class="btn-outline-dn" onclick="setRangoRapido('semana')">Esta semana</button>
+                <button class="btn-outline-dn" onclick="setRangoRapido('todo')">Todo</button>
+              </div>
             </div>
           </div>
         </div>
-        <div class="panel">
-          <div class="panel-header"><h6><i class="fas fa-table me-2"></i>Movimientos</h6></div>
-          <div class="table-wrapper">
-            <table class="table-dn"><thead><tr><th>Fecha</th><th>Tipo</th><th>Técnico</th><th>Material</th><th>Cat.</th><th>Cant.</th><th>Obs.</th></tr></thead><tbody id="repBody"></tbody></table>
+
+        <!-- KPIs -->
+        <div class="row g-2 mb-3" id="repStats"></div>
+
+        <!-- TABS -->
+        <div class="d-flex gap-2 mb-3 flex-wrap">
+          <button class="btn-outline-dn active" id="tabConsolidado" onclick="switchRepTab('consolidado',this)"><i class="fas fa-layer-group me-1"></i>Consolidado por Material</button>
+          <button class="btn-outline-dn" id="tabTecnicos" onclick="switchRepTab('tecnicos',this)"><i class="fas fa-hard-hat me-1"></i>Por Técnico</button>
+          <button class="btn-outline-dn" id="tabGraficas" onclick="switchRepTab('graficas',this)"><i class="fas fa-chart-bar me-1"></i>Gráficas</button>
+          <button class="btn-outline-dn" id="tabMovimientos" onclick="switchRepTab('movimientos',this)"><i class="fas fa-list me-1"></i>Movimientos</button>
+        </div>
+
+        <!-- TAB: CONSOLIDADO POR MATERIAL -->
+        <div id="repTabConsolidado" class="rep-tab">
+          <div class="panel">
+            <div class="panel-header"><h6><i class="fas fa-boxes-stacked me-2"></i>Consolidado — Material Utilizado en el Periodo</h6></div>
+            <div class="table-wrapper">
+              <table class="table-dn">
+                <thead><tr><th>Código</th><th>Material</th><th>Categoría</th><th>Unidad</th><th>Total Usado</th><th>Devuelto</th><th>Pérdida</th><th>Neto</th><th>Stock Actual</th></tr></thead>
+                <tbody id="repConsolidadoBody"></tbody>
+                <tfoot id="repConsolidadoFoot" style="font-weight:700;background:#f8fafc"></tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB: POR TÉCNICO -->
+        <div id="repTabTecnicos" class="rep-tab" style="display:none">
+          <div class="panel">
+            <div class="panel-header"><h6><i class="fas fa-hard-hat me-2"></i>Consumo por Técnico</h6></div>
+            <div class="table-wrapper">
+              <table class="table-dn">
+                <thead><tr><th>Técnico</th><th>Zona</th><th>Descargos</th><th>Unidades Usadas</th><th>Devueltas</th><th>Pérdidas</th><th>Tareas Completadas</th></tr></thead>
+                <tbody id="repTecnicosBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB: GRÁFICAS -->
+        <div id="repTabGraficas" class="rep-tab" style="display:none">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="panel"><div class="panel-body"><canvas id="chartDescargos" height="220"></canvas></div></div>
+            </div>
+            <div class="col-md-6">
+              <div class="panel"><div class="panel-body"><canvas id="chartPorTecnico" height="220"></canvas></div></div>
+            </div>
+            <div class="col-12">
+              <div class="panel"><div class="panel-body"><canvas id="chartPorMaterial" height="180"></canvas></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB: MOVIMIENTOS -->
+        <div id="repTabMovimientos" class="rep-tab" style="display:none">
+          <div class="panel">
+            <div class="panel-header"><h6><i class="fas fa-table me-2"></i>Detalle de Movimientos</h6></div>
+            <div class="table-wrapper">
+              <table class="table-dn"><thead><tr><th>Fecha</th><th>Tipo</th><th>Técnico</th><th>Material</th><th>Cat.</th><th>Cant.</th><th>Tarea</th><th>Obs.</th></tr></thead><tbody id="repBody"></tbody></table>
+            </div>
           </div>
         </div>
       </div>
@@ -929,7 +1035,7 @@ function buildSidebar() {
   if (['admin','bodeguero','supervisor'].includes(rol)) {
     html += `<div class="nav-section">Operaciones</div>
     <a class="nav-item-link" onclick="showSection('tareas');closeSidebar()" data-sec="tareas"><i class="fas fa-tasks"></i><span>Tareas</span></a>
-    <a class="nav-item-link" onclick="showSection('tecnicos');closeSidebar()" data-sec="tecnicos"><i class="fas fa-users"></i><span>Técnicos</span></a>
+    <a class="nav-item-link" onclick="showSection('tecnicos');closeSidebar()" data-sec="tecnicos"><i class="fas fa-users"></i><span>Usuarios</span></a>
     <a class="nav-item-link" onclick="showSection('reportes');closeSidebar()" data-sec="reportes"><i class="fas fa-chart-bar"></i><span>Reportes</span></a>`;
   }
   html += `<div class="nav-section">Sistema</div>
@@ -1033,8 +1139,8 @@ function estadoBadge(e) {
   return `<span class="badge-dn ${map[e]||'badge-gray'}">${labels[e]||e}</span>`;
 }
 function destroyCharts() {
-  [chartConsumo, chartDescargos, chartPorTec].forEach(c => { if (c) c.destroy(); });
-  chartConsumo = chartDescargos = chartPorTec = null;
+  [chartConsumo, chartDescargos, chartPorTec, chartPorMat].forEach(c => { if (c) c.destroy(); });
+  chartConsumo = chartDescargos = chartPorTec = chartPorMat = null;
 }
 function checkAlertas() {
   const low = DB.materiales.filter(m => m.stock <= m.min);
@@ -1359,7 +1465,7 @@ function verTareaDetalle(id) {
         <div><div style="font-weight:600;font-size:.82rem">GPS registrado</div>
         <div style="font-size:.75rem">${t.evidencia.gps.lat.toFixed(6)}, ${t.evidencia.gps.lng.toFixed(6)} &nbsp;
         <a href="https://maps.google.com/?q=${t.evidencia.gps.lat},${t.evidencia.gps.lng}" target="_blank" style="font-size:.75rem;color:var(--dn-blue)"><i class="fas fa-external-link-alt"></i> Ver mapa</a></div>
-        ${t.evidencia.gps.direccion?`<div style="font-size:.73rem;color:var(--dn-muted)">${t.evidencia.gps.direccion}</div>`:''}</div></div>`:''}
+        </div></div>`:''}
       ${t.evidencia.notas?`<div style="font-size:.83rem;margin-bottom:.5rem"><b>Notas:</b> ${t.evidencia.notas}</div>`:''}
       ${t.evidencia.fotos?.length?`<div class="ev-title mt-2"><i class="fas fa-camera me-1"></i>Fotos (${t.evidencia.fotos.length})</div>
         <div class="ev-photo-grid">${t.evidencia.fotos.map(f=>`<img src="${f}" onclick="verFotoGrande('${f}')" title="Clic para ampliar">`).join('')}</div>`:''}
@@ -1377,41 +1483,70 @@ function verTareaDetalle(id) {
 }
 
 // ══════════════════════════════════════════════
-//  TÉCNICOS
+//  USUARIOS (Técnicos, Supervisores, Bodegueros)
 // ══════════════════════════════════════════════
+function toggleCamposTec() {
+  const rol = document.getElementById('tecRol').value;
+  document.getElementById('camposTecnico').style.display = rol === 'tecnico' ? '' : 'none';
+}
 function crearTecnico() {
-  const nombre=document.getElementById('tecNombre').value.trim();
-  const user=document.getElementById('tecUser').value.trim();
-  const pass=document.getElementById('tecPass').value.trim();
-  if(!nombre||!user||!pass){toast('Nombre, usuario y contraseña son obligatorios','danger');return;}
-  if(DB.usuarios.find(u=>u.user===user)){toast('Ese usuario ya existe','danger');return;}
-  DB.usuarios.push({id:uid(),user,pass,nombre,rol:'tecnico',avatar:nombre[0].toUpperCase(),tel:document.getElementById('tecTel').value,zona:document.getElementById('tecZona').value});
-  addActividad('tecnico',`Nuevo técnico: ${nombre}`,'user-plus','blue');
+  const nombre = document.getElementById('tecNombre').value.trim();
+  const user   = document.getElementById('tecUser').value.trim();
+  const pass   = document.getElementById('tecPass').value.trim();
+  const rol    = document.getElementById('tecRol').value;
+  const email  = document.getElementById('tecEmail').value.trim();
+  if (!nombre || !user || !pass) { toast('Nombre, usuario y contraseña son obligatorios','danger'); return; }
+  if (DB.usuarios.find(u => u.user === user)) { toast('Ese usuario ya existe','danger'); return; }
+  const nuevo = { id:uid(), user, pass, nombre, rol, avatar:nombre[0].toUpperCase(), email };
+  if (rol === 'tecnico') {
+    nuevo.tel  = document.getElementById('tecTel').value;
+    nuevo.zona = document.getElementById('tecZona').value;
+  }
+  DB.usuarios.push(nuevo);
+  const rolLabel = { tecnico:'Técnico', supervisor:'Supervisor', bodeguero:'Bodeguero' };
+  addActividad('tecnico', `Nuevo ${rolLabel[rol]||rol}: ${nombre}`, 'user-plus', 'blue');
   saveDB();
-  ['tecNombre','tecUser','tecTel'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('tecPass').value='tec123';
-  renderTecnicos(); toast('Técnico registrado');
+  ['tecNombre','tecUser','tecTel','tecEmail'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('tecPass').value = 'dukenet123';
+  renderTecnicos();
+  toast(`${rolLabel[rol]||'Usuario'} registrado`);
 }
 function renderTecnicos() {
-  const tecs=getTecnicos();
-  document.getElementById('tecnicosBody').innerHTML=tecs.length?tecs.map(t=>{
-    const matActivo=DB.asignaciones.filter(a=>a.tecId===t.id&&a.estado!=='descargado').length;
-    const tareasT=DB.tareas.filter(x=>x.tecId===t.id&&!['completada','cancelada'].includes(x.estado)).length;
+  const filtRol = document.getElementById('filtRolUsuarios')?.value || '';
+  const rolLabel = { tecnico:'Técnico', supervisor:'Supervisor', bodeguero:'Bodeguero', admin:'Admin' };
+  const rolBadge = { tecnico:'badge-cyan', supervisor:'badge-purple', bodeguero:'badge-info', admin:'badge-danger' };
+  const usuarios = DB.usuarios.filter(u => u.rol !== 'admin' && (!filtRol || u.rol === filtRol));
+  document.getElementById('tecnicosBody').innerHTML = usuarios.length ? usuarios.map(u => {
+    const matActivo = DB.asignaciones.filter(a => a.tecId===u.id && a.estado!=='descargado').length;
+    const tareasT   = DB.tareas.filter(x => x.tecId===u.id && !['completada','cancelada'].includes(x.estado)).length;
     return `<tr>
-      <td><div style="font-weight:600;font-size:.87rem">${t.nombre}</div></td>
-      <td><code style="font-size:.8rem">${t.user}</code></td>
-      <td><span class="badge-dn badge-info" style="font-size:.7rem">${t.zona||'—'}</span></td>
-      <td style="font-size:.82rem">${t.tel||'—'}</td>
+      <td><div style="font-weight:600;font-size:.87rem">${u.nombre}</div>${u.email?`<div style="font-size:.72rem;color:var(--dn-muted)">${u.email}</div>`:''}</td>
+      <td><code style="font-size:.8rem">${u.user}</code></td>
+      <td><span class="badge-dn ${rolBadge[u.rol]||'badge-gray'}" style="font-size:.7rem">${rolLabel[u.rol]||u.rol}</span></td>
+      <td style="font-size:.8rem">${u.zona?`<span class="badge-dn badge-info" style="font-size:.68rem">${u.zona}</span> `:''} ${u.tel||u.email||'—'}</td>
       <td><span class="badge-dn ${matActivo>0?'badge-warn':'badge-gray'}">${matActivo}</span></td>
       <td><span class="badge-dn ${tareasT>0?'badge-cyan':'badge-gray'}">${tareasT}</span></td>
-      <td><button class="btn-sm-icon text-danger" onclick="eliminarTecnico('${t.id}')"><i class="fas fa-trash"></i></button></td>
+      <td>
+        <button class="btn-sm-icon text-primary" title="Editar contraseña" onclick="editarUsuario('${u.id}')"><i class="fas fa-key"></i></button>
+        <button class="btn-sm-icon text-danger" onclick="eliminarTecnico('${u.id}')"><i class="fas fa-trash"></i></button>
+      </td>
     </tr>`;
-  }).join(''):'<tr><td colspan="7"><div class="empty-state"><i class="fas fa-users"></i>Sin técnicos</div></td></tr>';
+  }).join('') : '<tr><td colspan="7"><div class="empty-state"><i class="fas fa-users"></i>Sin usuarios en este filtro</div></td></tr>';
 }
 function eliminarTecnico(id) {
-  if(!confirm('¿Eliminar este técnico?')) return;
-  DB.usuarios=DB.usuarios.filter(u=>u.id!==id);
-  saveDB(); renderTecnicos(); toast('Técnico eliminado','warning');
+  const u = DB.usuarios.find(x => x.id===id);
+  if (u?.rol==='admin') { toast('No se puede eliminar al administrador','danger'); return; }
+  if (!confirm(`¿Eliminar usuario "${u?.nombre}"?`)) return;
+  DB.usuarios = DB.usuarios.filter(x => x.id !== id);
+  saveDB(); renderTecnicos(); toast('Usuario eliminado','warning');
+}
+function editarUsuario(id) {
+  const u = DB.usuarios.find(x => x.id===id);
+  if (!u) return;
+  const newPass = prompt(`Cambiar contraseña de ${u.nombre}\nActual: ${u.pass}\n\nNueva contraseña:`);
+  if (newPass === null || !newPass.trim()) return;
+  u.pass = newPass.trim();
+  saveDB(); toast(`Contraseña de ${u.nombre} actualizada`);
 }
 
 // ══════════════════════════════════════════════
@@ -1466,39 +1601,209 @@ function renderMisAsignaciones() {
 // ══════════════════════════════════════════════
 //  REPORTES
 // ══════════════════════════════════════════════
+let repTabActual = 'consolidado';
+let chartPorMat;
+
 function populateReportes() {
-  const tecs=getTecnicos();
-  document.getElementById('repTecFilt').innerHTML='<option value="">Todos los técnicos</option>'+tecs.map(t=>`<option value="${t.id}">${t.nombre}</option>`).join('');
+  const tecs = getTecnicos();
+  document.getElementById('repTecFilt').innerHTML = '<option value="">Todos</option>' + tecs.map(t=>`<option value="${t.id}">${t.nombre}</option>`).join('');
+  const hoy = new Date();
+  const primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0,10);
+  document.getElementById('repFechaDesde').value = primerDia;
+  document.getElementById('repFechaHasta').value = hoy.toISOString().slice(0,10);
 }
+
+function setRangoRapido(tipo) {
+  const hoy = new Date();
+  let desde, hasta = hoy.toISOString().slice(0,10);
+  if (tipo === 'mes') {
+    desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0,10);
+  } else if (tipo === 'semana') {
+    const d = new Date(hoy); d.setDate(hoy.getDate() - hoy.getDay());
+    desde = d.toISOString().slice(0,10);
+  } else {
+    desde = '2020-01-01'; hasta = '2099-12-31';
+  }
+  document.getElementById('repFechaDesde').value = desde;
+  document.getElementById('repFechaHasta').value = hasta;
+  renderReporte();
+}
+
+function getDescFiltrados() {
+  const filtTec   = document.getElementById('repTecFilt').value;
+  const filtCat   = document.getElementById('repCatFilt').value;
+  const desde     = document.getElementById('repFechaDesde').value;
+  const hasta     = document.getElementById('repFechaHasta').value;
+  const filtUso   = document.getElementById('repFiltUso').checked;
+  const filtDev   = document.getElementById('repFiltDev').checked;
+  const filtPerd  = document.getElementById('repFiltPerd').checked;
+  const tiposOk   = [...(filtUso?['uso']:[]), ...(filtDev?['devolucion']:[]), ...(filtPerd?['perdida']:[])];
+  return DB.descargos.filter(d => {
+    const m = getMaterial(d.matId);
+    return (!filtTec  || d.tecId === filtTec)
+        && (!filtCat  || m?.cat === filtCat)
+        && (!desde    || d.fecha >= desde)
+        && (!hasta    || d.fecha <= hasta)
+        && (tiposOk.length === 0 || tiposOk.includes(d.tipo));
+  });
+}
+
+function switchRepTab(tab, btn) {
+  repTabActual = tab;
+  document.querySelectorAll('.rep-tab').forEach(el => el.style.display = 'none');
+  document.getElementById(`repTab${tab.charAt(0).toUpperCase()+tab.slice(1)}`).style.display = '';
+  document.querySelectorAll('#sec-reportes .btn-outline-dn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  if (tab === 'graficas') renderGraficas(getDescFiltrados());
+}
+
 function renderReporte() {
-  const filtTec=document.getElementById('repTecFilt').value;
-  const filtCat=document.getElementById('repCatFilt').value;
-  const desc=DB.descargos.filter(d=>{const m=getMaterial(d.matId);return(!filtTec||d.tecId===filtTec)&&(!filtCat||m?.cat===filtCat);});
-  const uso=desc.filter(d=>d.tipo==='uso').reduce((s,d)=>s+d.cantidad,0);
-  const dev=desc.filter(d=>d.tipo==='devolucion').reduce((s,d)=>s+d.cantidad,0);
-  const perd=desc.filter(d=>d.tipo==='perdida').reduce((s,d)=>s+d.cantidad,0);
+  const desc = getDescFiltrados();
+  const uso  = desc.filter(d=>d.tipo==='uso').reduce((s,d)=>s+d.cantidad,0);
+  const dev  = desc.filter(d=>d.tipo==='devolucion').reduce((s,d)=>s+d.cantidad,0);
+  const perd = desc.filter(d=>d.tipo==='perdida').reduce((s,d)=>s+d.cantidad,0);
+  const desde = document.getElementById('repFechaDesde').value;
+  const hasta = document.getElementById('repFechaHasta').value;
   document.getElementById('repStats').innerHTML=`
-    <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-icon blue"><i class="fas fa-list"></i></div><div><div class="stat-val">${desc.length}</div><div class="stat-lbl">Descargos</div></div></div></div>
-    <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-icon green"><i class="fas fa-tools"></i></div><div><div class="stat-val">${uso}</div><div class="stat-lbl">Usadas</div></div></div></div>
+    <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-icon blue"><i class="fas fa-calendar-alt"></i></div><div>
+      <div class="stat-val" style="font-size:1.1rem">${desde?desde.slice(5):'—'} → ${hasta?hasta.slice(5):'—'}</div>
+      <div class="stat-lbl">Rango de fechas</div></div></div></div>
+    <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-icon green"><i class="fas fa-tools"></i></div><div><div class="stat-val">${uso}</div><div class="stat-lbl">Unidades Usadas</div></div></div></div>
     <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-icon cyan"><i class="fas fa-undo"></i></div><div><div class="stat-val">${dev}</div><div class="stat-lbl">Devueltas</div></div></div></div>
-    <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-icon red"><i class="fas fa-times-circle"></i></div><div><div class="stat-val">${perd}</div><div class="stat-lbl">Pérdidas</div></div></div></div>`;
-  destroyCharts();
-  const ctx1=document.getElementById('chartDescargos');
-  if(ctx1) chartDescargos=new Chart(ctx1,{type:'doughnut',data:{labels:['Uso','Devolución','Pérdida'],datasets:[{data:[uso,dev,perd],backgroundColor:['#0d47a1','#2e7d32','#c62828'],borderWidth:2}]},options:{responsive:true,plugins:{legend:{position:'bottom'},title:{display:true,text:'Tipo de Descargo'}}}});
-  const tecs=getTecnicos();
-  const cntByTec=tecs.map(t=>desc.filter(d=>d.tecId===t.id).reduce((s,d)=>s+d.cantidad,0));
-  const ctx2=document.getElementById('chartPorTecnico');
-  if(ctx2) chartPorTec=new Chart(ctx2,{type:'bar',data:{labels:tecs.map(t=>t.nombre.split(' ')[0]),datasets:[{label:'Unidades',data:cntByTec,backgroundColor:'#00bcd4',borderRadius:6}]},options:{responsive:true,plugins:{legend:{display:false},title:{display:true,text:'Consumo por Técnico'}},scales:{y:{beginAtZero:true}}}});
-  const tipoLabel={uso:'Uso',devolucion:'Dev.',perdida:'Pérdida'};
-  document.getElementById('repBody').innerHTML=[...desc].reverse().map(d=>{
-    const m=getMaterial(d.matId);const tec=getTecnico(d.tecId);
+    <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-icon red"><i class="fas fa-times-circle"></i></div><div><div class="stat-val">${perd}</div><div class="stat-lbl">Pérdidas/Daños</div></div></div></div>`;
+  renderConsolidado(desc);
+  renderRepTecnicos(desc);
+  renderMovimientos(desc);
+  if (repTabActual === 'graficas') renderGraficas(desc);
+}
+
+function renderConsolidado(desc) {
+  const mapa = {};
+  desc.forEach(d => {
+    if (!mapa[d.matId]) mapa[d.matId] = { uso:0, dev:0, perd:0 };
+    if (d.tipo==='uso')        mapa[d.matId].uso  += d.cantidad;
+    if (d.tipo==='devolucion') mapa[d.matId].dev  += d.cantidad;
+    if (d.tipo==='perdida')    mapa[d.matId].perd += d.cantidad;
+  });
+  const items = Object.entries(mapa).map(([matId, v]) => ({ mat: getMaterial(matId), ...v })).filter(x => x.mat);
+  items.sort((a,b) => b.uso - a.uso);
+  let totalUso=0, totalDev=0, totalPerd=0;
+  document.getElementById('repConsolidadoBody').innerHTML = items.length ? items.map(r => {
+    const neto = r.uso - r.dev;
+    totalUso += r.uso; totalDev += r.dev; totalPerd += r.perd;
+    return `<tr>
+      <td><code style="font-size:.78rem">${r.mat.cod}</code></td>
+      <td><div style="font-weight:600;font-size:.85rem">${r.mat.nombre}</div></td>
+      <td><span class="chip-category ${r.mat.cat}">${CATEGORIAS[r.mat.cat]||r.mat.cat}</span></td>
+      <td style="font-size:.82rem">${r.mat.unidad}</td>
+      <td><b style="color:var(--dn-blue)">${r.uso}</b></td>
+      <td style="color:var(--dn-success)">${r.dev}</td>
+      <td style="color:var(--dn-danger)">${r.perd}</td>
+      <td><b style="color:${neto>0?'var(--dn-warning)':'#555'}">${neto}</b></td>
+      <td><span class="badge-dn ${r.mat.stock<=r.mat.min?'badge-danger':r.mat.stock<=r.mat.min*1.5?'badge-warn':'badge-ok'}">${r.mat.stock} ${r.mat.unidad}</span></td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="9"><div class="empty-state"><i class="fas fa-search"></i>Sin movimientos en el periodo</div></td></tr>';
+  document.getElementById('repConsolidadoFoot').innerHTML = items.length ? `<tr>
+    <td colspan="4" style="padding:.65rem .85rem;font-size:.82rem">TOTALES DEL PERIODO</td>
+    <td style="padding:.65rem .85rem;color:var(--dn-blue)">${totalUso}</td>
+    <td style="padding:.65rem .85rem;color:var(--dn-success)">${totalDev}</td>
+    <td style="padding:.65rem .85rem;color:var(--dn-danger)">${totalPerd}</td>
+    <td style="padding:.65rem .85rem"><b>${totalUso-totalDev}</b></td>
+    <td></td>
+  </tr>` : '';
+}
+
+function renderRepTecnicos(desc) {
+  const tecs = getTecnicos();
+  const desde = document.getElementById('repFechaDesde').value;
+  const hasta = document.getElementById('repFechaHasta').value;
+  document.getElementById('repTecnicosBody').innerHTML = tecs.map(t => {
+    const dTec   = desc.filter(d => d.tecId===t.id);
+    const usoT   = dTec.filter(d=>d.tipo==='uso').reduce((s,d)=>s+d.cantidad,0);
+    const devT   = dTec.filter(d=>d.tipo==='devolucion').reduce((s,d)=>s+d.cantidad,0);
+    const perdT  = dTec.filter(d=>d.tipo==='perdida').reduce((s,d)=>s+d.cantidad,0);
+    const tarsComp = DB.tareas.filter(x => x.tecId===t.id && x.estado==='completada'
+      && (!desde || x.fecha>=desde) && (!hasta || x.fecha<=hasta)).length;
+    if (dTec.length===0 && tarsComp===0) return '';
+    return `<tr>
+      <td><div style="font-weight:600;font-size:.87rem">${t.nombre}</div></td>
+      <td><span class="badge-dn badge-info" style="font-size:.7rem">${t.zona||'—'}</span></td>
+      <td>${dTec.length}</td>
+      <td><b style="color:var(--dn-blue)">${usoT}</b></td>
+      <td style="color:var(--dn-success)">${devT}</td>
+      <td style="color:${perdT>0?'var(--dn-danger)':'#555'}">${perdT}</td>
+      <td><span class="badge-dn ${tarsComp>0?'badge-ok':'badge-gray'}">${tarsComp}</span></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7"><div class="empty-state"><i class="fas fa-hard-hat"></i>Sin actividad en el periodo</div></td></tr>';
+}
+
+function renderMovimientos(desc) {
+  const tipoLabel = { uso:'Uso',devolucion:'Dev.',perdida:'Pérdida' };
+  document.getElementById('repBody').innerHTML = [...desc].reverse().map(d => {
+    const m=getMaterial(d.matId); const tec=getTecnico(d.tecId); const tar=getTarea(d.tareaId||'');
     return `<tr><td>${d.fecha}</td>
       <td><span class="badge-dn ${d.tipo==='uso'?'badge-info':d.tipo==='devolucion'?'badge-ok':'badge-danger'}">${tipoLabel[d.tipo]||d.tipo}</span></td>
       <td>${tec?.nombre||'—'}</td><td>${m?.nombre||'—'}</td>
       <td><span class="chip-category ${m?.cat||''}">${CATEGORIAS[m?.cat]||'—'}</span></td>
       <td><b>${d.cantidad}</b> ${m?.unidad||''}</td>
+      <td style="font-size:.78rem;max-width:120px">${tar?.titulo||'—'}</td>
       <td style="font-size:.78rem">${d.obs||'—'}</td></tr>`;
-  }).join('')||'<tr><td colspan="7" class="text-center text-muted py-3">Sin movimientos</td></tr>';
+  }).join('') || '<tr><td colspan="8" class="text-center text-muted py-3">Sin movimientos en el periodo</td></tr>';
+}
+
+function renderGraficas(desc) {
+  destroyCharts();
+  const uso  = desc.filter(d=>d.tipo==='uso').reduce((s,d)=>s+d.cantidad,0);
+  const dev  = desc.filter(d=>d.tipo==='devolucion').reduce((s,d)=>s+d.cantidad,0);
+  const perd = desc.filter(d=>d.tipo==='perdida').reduce((s,d)=>s+d.cantidad,0);
+  const ctx1 = document.getElementById('chartDescargos');
+  if(ctx1) chartDescargos = new Chart(ctx1,{type:'doughnut',data:{labels:['Uso en obra','Devolución','Pérdida/Daño'],datasets:[{data:[uso,dev,perd],backgroundColor:['#0d47a1','#2e7d32','#c62828'],borderWidth:2}]},options:{responsive:true,plugins:{legend:{position:'bottom'},title:{display:true,text:'Tipo de Movimiento'}}}});
+  const tecs = getTecnicos();
+  const cntByTec = tecs.map(t=>desc.filter(d=>d.tecId===t.id&&d.tipo==='uso').reduce((s,d)=>s+d.cantidad,0));
+  const ctx2 = document.getElementById('chartPorTecnico');
+  if(ctx2) chartPorTec = new Chart(ctx2,{type:'bar',data:{labels:tecs.map(t=>t.nombre.split(' ')[0]),datasets:[{label:'Unidades usadas',data:cntByTec,backgroundColor:'#00bcd4',borderRadius:6}]},options:{responsive:true,plugins:{legend:{display:false},title:{display:true,text:'Uso por Técnico'}},scales:{y:{beginAtZero:true}}}});
+  const mapa={};
+  desc.filter(d=>d.tipo==='uso').forEach(d=>{mapa[d.matId]=(mapa[d.matId]||0)+d.cantidad;});
+  const top8 = Object.entries(mapa).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const ctx3 = document.getElementById('chartPorMaterial');
+  if(ctx3) chartPorMat = new Chart(ctx3,{type:'bar',data:{
+    labels:top8.map(([id])=>getMaterial(id)?.nombre.slice(0,25)||id),
+    datasets:[{label:'Unidades usadas',data:top8.map(([,v])=>v),backgroundColor:'#1565c0',borderRadius:6}]
+  },options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false},title:{display:true,text:'Top Materiales Consumidos'}},scales:{x:{beginAtZero:true}}}});
+}
+
+function exportarCSV() {
+  const desc = getDescFiltrados();
+  const desde = document.getElementById('repFechaDesde').value || 'inicio';
+  const hasta = document.getElementById('repFechaHasta').value || 'hoy';
+  const tipoLabel = {uso:'Uso en obra',devolucion:'Devolución',perdida:'Pérdida/Daño'};
+  const mapa={};
+  desc.forEach(d=>{
+    if(!mapa[d.matId]) mapa[d.matId]={uso:0,dev:0,perd:0};
+    if(d.tipo==='uso') mapa[d.matId].uso+=d.cantidad;
+    if(d.tipo==='devolucion') mapa[d.matId].dev+=d.cantidad;
+    if(d.tipo==='perdida') mapa[d.matId].perd+=d.cantidad;
+  });
+  let csv = `Reporte Dukenet Bodega — ${desde} a ${hasta}\n\n`;
+  csv += `=== CONSOLIDADO POR MATERIAL ===\n`;
+  csv += `Código,Material,Categoría,Unidad,Usado,Devuelto,Pérdida,Neto consumido\n`;
+  Object.entries(mapa).forEach(([id,v])=>{
+    const m=getMaterial(id);
+    if(!m) return;
+    csv+=`"${m.cod}","${m.nombre}","${CATEGORIAS[m.cat]||m.cat}","${m.unidad}",${v.uso},${v.dev},${v.perd},${v.uso-v.dev}\n`;
+  });
+  csv += `\n=== DETALLE DE MOVIMIENTOS ===\n`;
+  csv += `Fecha,Tipo,Técnico,Material,Categoría,Cantidad,Tarea,Observación\n`;
+  [...desc].reverse().forEach(d=>{
+    const m=getMaterial(d.matId); const tec=getTecnico(d.tecId); const tar=getTarea(d.tareaId||'');
+    csv+=`"${d.fecha}","${tipoLabel[d.tipo]||d.tipo}","${tec?.nombre||''}","${m?.nombre||''}","${CATEGORIAS[m?.cat]||''}",${d.cantidad},"${tar?.titulo||''}","${(d.obs||'').replace(/"/g,"'")}"\n`;
+  });
+  const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `dukenet-informe-${desde}-${hasta}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  toast('CSV exportado exitosamente');
 }
 
 // ══════════════════════════════════════════════
@@ -1530,8 +1835,6 @@ function abrirEjecutar(tareaId) {
   ejFotos = [];
   sigTieneFirma = false;
   const t = getTarea(tareaId);
-
-  // Info tarea
   document.getElementById('ejTareaInfo').innerHTML = `
     <div class="d-flex justify-content-between align-items-start">
       <div>
@@ -1541,30 +1844,18 @@ function abrirEjecutar(tareaId) {
       </div>
       ${estadoBadge(t.estado)}
     </div>`;
-
-  // Estado sugerido
   document.getElementById('ejEstado').value = t.estado === 'en_progreso' ? 'completada' : 'en_progreso';
   document.getElementById('ejNotas').value = '';
   document.getElementById('photoGrid').innerHTML = '';
   document.getElementById('sigStatus').textContent = '';
-
-  // Abrir modal
   bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEjecutar')).show();
-
-  // Init canvas firma
-  setTimeout(() => {
-    initSignatureCanvas();
-  }, 300);
-
-  // GPS
+  setTimeout(() => { initSignatureCanvas(); }, 300);
   capturarGPS();
 }
 
-// ── SIGNATURE PAD ──
 function initSignatureCanvas() {
   sigCanvas = document.getElementById('signatureCanvas');
   sigCtx = sigCanvas.getContext('2d');
-  // Ajustar resolución real
   const rect = sigCanvas.getBoundingClientRect();
   sigCanvas.width = rect.width * window.devicePixelRatio;
   sigCanvas.height = 160 * window.devicePixelRatio;
@@ -1574,12 +1865,9 @@ function initSignatureCanvas() {
   sigCtx.lineCap = 'round';
   sigCtx.lineJoin = 'round';
   limpiarFirma();
-
-  // Eventos touch
   sigCanvas.addEventListener('touchstart', sigStart, { passive: false });
   sigCanvas.addEventListener('touchmove',  sigMove,  { passive: false });
   sigCanvas.addEventListener('touchend',   sigEnd);
-  // Eventos mouse
   sigCanvas.addEventListener('mousedown', e => sigStart(e));
   sigCanvas.addEventListener('mousemove', e => { if(sigDibujando) sigMove(e); });
   sigCanvas.addEventListener('mouseup',   sigEnd);
@@ -1605,7 +1893,7 @@ function sigMove(e) {
   sigCtx.lineTo(p.x, p.y);
   sigCtx.stroke();
   sigTieneFirma = true;
-  document.getElementById('sigStatus').textContent = '✓ Firma capturada';
+  document.getElementById('sigStatus').textContent = 'Firma capturada';
   document.getElementById('sigStatus').style.color = 'var(--dn-success)';
 }
 function sigEnd() { sigDibujando = false; }
@@ -1616,17 +1904,16 @@ function limpiarFirma() {
   sigCtx.fillStyle = '#f8fafc';
   sigCtx.fillRect(0, 0, rect.width, 160);
   sigTieneFirma = false;
-  document.getElementById('sigStatus').textContent = '';
+  const el = document.getElementById('sigStatus');
+  if (el) el.textContent = '';
 }
 
-// ── GPS ──
 function capturarGPS() {
   const box = document.getElementById('gpsBox');
   document.getElementById('ejLat').value = '';
   document.getElementById('ejLng').value = '';
   box.className = 'gps-box';
   box.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Obteniendo ubicación...';
-
   if (!navigator.geolocation) {
     box.className = 'gps-box error';
     box.innerHTML = '<i class="fas fa-times-circle text-warning"></i> GPS no disponible en este dispositivo';
@@ -1642,7 +1929,7 @@ function capturarGPS() {
       box.className = 'gps-box';
       box.innerHTML = `<i class="fas fa-map-marker-alt text-danger"></i>
         <div>
-          <div style="font-weight:700;font-size:.85rem">Ubicación capturada ✓</div>
+          <div style="font-weight:700;font-size:.85rem">Ubicación capturada</div>
           <div style="font-size:.75rem">${lat.toFixed(6)}, ${lng.toFixed(6)}</div>
           <div style="font-size:.72rem;color:var(--dn-muted)">Precisión: ~${acc}m &nbsp;
           <a href="https://maps.google.com/?q=${lat},${lng}" target="_blank" style="color:var(--dn-blue)">Ver en mapa <i class="fas fa-external-link-alt"></i></a></div>
@@ -1661,7 +1948,6 @@ function capturarGPS() {
   );
 }
 
-// ── FOTOS ──
 function agregarFotos(input) {
   const files = Array.from(input.files);
   const grid = document.getElementById('photoGrid');
@@ -1683,28 +1969,20 @@ function agregarFotos(input) {
 function eliminarFoto(idx, el) {
   ejFotos.splice(idx, 1);
   el.remove();
-  // Re-index buttons
   document.querySelectorAll('#photoGrid .del-photo').forEach((btn, i) => {
     btn.setAttribute('onclick', `eliminarFoto(${i},this.parentElement)`);
   });
 }
 
-// ── GUARDAR EJECUCIÓN ──
 function guardarEjecucion() {
   const t = getTarea(ejTareaId);
   if (!t) return;
-  const lat = document.getElementById('ejLat').value;
-  const lng = document.getElementById('ejLng').value;
+  const lat   = document.getElementById('ejLat').value;
+  const lng   = document.getElementById('ejLng').value;
   const notas = document.getElementById('ejNotas').value.trim();
   const estado = document.getElementById('ejEstado').value;
-
-  // Capturar firma
   let firmaB64 = null;
-  if (sigTieneFirma && sigCanvas) {
-    firmaB64 = sigCanvas.toDataURL('image/png');
-  }
-
-  // Construir evidencia
+  if (sigTieneFirma && sigCanvas) { firmaB64 = sigCanvas.toDataURL('image/png'); }
   t.evidencia = {
     fecha: new Date().toLocaleString('es-CO'),
     gps: lat && lng ? { lat: parseFloat(lat), lng: parseFloat(lng) } : null,
@@ -1714,18 +1992,16 @@ function guardarEjecucion() {
     tecnico: currentUser.nombre
   };
   t.estado = estado;
-
   addActividad('tarea',
-    `${currentUser.nombre} ejecutó "${t.titulo}" ${ejFotos.length?`📷${ejFotos.length}foto(s)`:''} ${firmaB64?'✍️firmado':''}`,
+    `${currentUser.nombre} ejecutó "${t.titulo}"${ejFotos.length?' ('+ejFotos.length+' fotos)':''}${firmaB64?' + firma':''}`,
     'clipboard-check', estado==='completada'?'green':'cyan'
   );
   saveDB();
   bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEjecutar')).hide();
   renderMisTareas();
-  toast(`Orden registrada con evidencia${firmaB64?' y firma':''} ✓`);
+  toast(`Orden registrada con evidencia${firmaB64?' y firma':''}`);
 }
 
-// ── VER EVIDENCIA ──
 function verEvidencia(tareaId) {
   const t = getTarea(tareaId);
   const ev = t?.evidencia;
