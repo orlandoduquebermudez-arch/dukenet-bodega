@@ -236,6 +236,23 @@
   .w-100 { width: 100%; }
   .cursor-pointer { cursor: pointer; }
 
+  /* ─── EJECUCIÓN DE ORDEN ─── */
+  #signatureCanvas { border: 2px dashed var(--dn-border); border-radius: 10px; background: #f8fafc; touch-action: none; cursor: crosshair; display: block; width: 100%; }
+  .sig-toolbar { display: flex; gap: .5rem; margin-top: .4rem; }
+  .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px,1fr)); gap: .5rem; margin-top: .5rem; }
+  .photo-thumb { position: relative; border-radius: 8px; overflow: hidden; aspect-ratio: 1; }
+  .photo-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .photo-thumb .del-photo { position: absolute; top: 3px; right: 3px; background: rgba(0,0,0,.6); color: #fff; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: .7rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .gps-box { background: #e3f2fd; border-radius: 10px; padding: .6rem .9rem; font-size: .82rem; display: flex; align-items: center; gap: .5rem; }
+  .gps-box.error { background: #fff3e0; }
+  .evidencia-section { background: #f8fafc; border-radius: 10px; padding: .8rem; margin-top: .75rem; }
+  .evidencia-section .ev-title { font-size: .78rem; font-weight: 700; color: var(--dn-muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: .5rem; }
+  .ev-sig-img { border-radius: 8px; border: 1px solid var(--dn-border); max-width: 100%; max-height: 120px; background: #fff; }
+  .ev-photo-grid { display: flex; flex-wrap: wrap; gap: .4rem; }
+  .ev-photo-grid img { width: 70px; height: 70px; object-fit: cover; border-radius: 6px; border: 1px solid var(--dn-border); cursor: pointer; }
+  .btn-camara { background: #e3f2fd; color: var(--dn-blue); border: 2px dashed var(--dn-blue); border-radius: 10px; padding: .6rem 1rem; font-size: .85rem; font-weight: 600; cursor: pointer; width: 100%; text-align: center; }
+  .btn-camara:active { background: #bbdefb; }
+
   /* ─── RESPONSIVE ─── */
   @media (max-width: 768px) {
     .sidebar { transform: translateX(-100%); width: 260px; }
@@ -628,6 +645,74 @@
       </div>
       <div class="modal-body" id="modalTareaDetalleBody"></div>
       <div class="modal-footer" id="modalTareaDetalleFooter"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EJECUTAR ORDEN -->
+<div class="modal fade" id="modalEjecutar" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-lg modal-fullscreen-md-down">
+    <div class="modal-content">
+      <div class="modal-header" style="background:linear-gradient(135deg,var(--dn-blue),#1565c0);color:#fff">
+        <h5 class="modal-title text-white"><i class="fas fa-clipboard-list me-2"></i>Ejecutar Orden de Trabajo</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:1rem">
+        <!-- Info tarea -->
+        <div id="ejTareaInfo" class="mb-3 p-3" style="background:#f0f4f8;border-radius:10px;font-size:.85rem"></div>
+
+        <!-- GPS -->
+        <div class="mb-3">
+          <label class="form-label"><i class="fas fa-map-marker-alt me-1 text-danger"></i>Ubicación GPS</label>
+          <div id="gpsBox" class="gps-box">
+            <i class="fas fa-spinner fa-spin"></i> Obteniendo ubicación...
+          </div>
+          <input type="hidden" id="ejLat">
+          <input type="hidden" id="ejLng">
+        </div>
+
+        <!-- Fotos -->
+        <div class="mb-3">
+          <label class="form-label"><i class="fas fa-camera me-1 text-primary"></i>Fotos de la orden</label>
+          <label class="btn-camara" for="inputFotos">
+            <i class="fas fa-camera me-2"></i>Tomar foto / Seleccionar imagen
+          </label>
+          <input type="file" id="inputFotos" accept="image/*" capture="environment" multiple style="display:none" onchange="agregarFotos(this)">
+          <div class="photo-grid" id="photoGrid"></div>
+        </div>
+
+        <!-- Notas -->
+        <div class="mb-3">
+          <label class="form-label"><i class="fas fa-sticky-note me-1 text-warning"></i>Notas del trabajo</label>
+          <textarea id="ejNotas" class="form-control" rows="2" placeholder="Describe el trabajo realizado, inconvenientes, observaciones..."></textarea>
+        </div>
+
+        <!-- Firma -->
+        <div class="mb-3">
+          <label class="form-label"><i class="fas fa-signature me-1 text-success"></i>Firma del cliente / responsable</label>
+          <div style="background:#fff;border-radius:10px;padding:.5rem;border:1px solid var(--dn-border)">
+            <div style="font-size:.75rem;color:var(--dn-muted);text-align:center;margin-bottom:.3rem">Firme en el recuadro abajo</div>
+            <canvas id="signatureCanvas" height="160"></canvas>
+          </div>
+          <div class="sig-toolbar">
+            <button class="btn-outline-dn" style="font-size:.78rem;padding:4px 10px" onclick="limpiarFirma()"><i class="fas fa-eraser me-1"></i>Borrar firma</button>
+            <span id="sigStatus" style="font-size:.75rem;color:var(--dn-muted);align-self:center"></span>
+          </div>
+        </div>
+
+        <!-- Estado -->
+        <div class="mb-1">
+          <label class="form-label"><i class="fas fa-flag me-1"></i>Cambiar estado de la tarea</label>
+          <select id="ejEstado" class="form-select">
+            <option value="en_progreso">En Progreso (iniciada)</option>
+            <option value="completada">Completada ✅</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-outline-dn" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn-primary-dn" onclick="guardarEjecucion()"><i class="fas fa-save me-1"></i>Guardar y Registrar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1268,6 +1353,20 @@ function verTareaDetalle(id) {
     <div class="table-wrapper"><table class="table-dn"><thead><tr><th>Material</th><th>Asignado</th><th>Pendiente</th><th>Estado</th></tr></thead><tbody>
     ${matAsig.map(a=>{const m=getMaterial(a.matId);return`<tr><td>${m?.nombre||'—'}</td><td>${a.cantidad} ${m?.unidad||''}</td><td>${a.pendiente}</td><td>${estadoBadge(a.estado)}</td></tr>`;}).join('')}
     </tbody></table></div>`:'<div class="text-muted" style="font-size:.85rem">Sin material asignado.</div>'}
+    ${t.evidencia?`<div class="evidencia-section mt-3">
+      <div class="ev-title"><i class="fas fa-file-image me-1"></i>Evidencia de ejecución</div>
+      ${t.evidencia.gps?`<div class="gps-box mb-2"><i class="fas fa-map-marker-alt text-danger"></i>
+        <div><div style="font-weight:600;font-size:.82rem">GPS registrado</div>
+        <div style="font-size:.75rem">${t.evidencia.gps.lat.toFixed(6)}, ${t.evidencia.gps.lng.toFixed(6)} &nbsp;
+        <a href="https://maps.google.com/?q=${t.evidencia.gps.lat},${t.evidencia.gps.lng}" target="_blank" style="font-size:.75rem;color:var(--dn-blue)"><i class="fas fa-external-link-alt"></i> Ver mapa</a></div>
+        ${t.evidencia.gps.direccion?`<div style="font-size:.73rem;color:var(--dn-muted)">${t.evidencia.gps.direccion}</div>`:''}</div></div>`:''}
+      ${t.evidencia.notas?`<div style="font-size:.83rem;margin-bottom:.5rem"><b>Notas:</b> ${t.evidencia.notas}</div>`:''}
+      ${t.evidencia.fotos?.length?`<div class="ev-title mt-2"><i class="fas fa-camera me-1"></i>Fotos (${t.evidencia.fotos.length})</div>
+        <div class="ev-photo-grid">${t.evidencia.fotos.map(f=>`<img src="${f}" onclick="verFotoGrande('${f}')" title="Clic para ampliar">`).join('')}</div>`:''}
+      ${t.evidencia.firma?`<div class="ev-title mt-2"><i class="fas fa-signature me-1"></i>Firma</div>
+        <img class="ev-sig-img" src="${t.evidencia.firma}">`:''}
+      ${t.evidencia.fecha?`<div style="font-size:.72rem;color:var(--dn-muted);margin-top:.5rem"><i class="far fa-clock me-1"></i>Registrado: ${t.evidencia.fecha}</div>`:''}
+    </div>`:''}
   `;
   document.getElementById('modalTareaDetalleFooter').innerHTML=`
     <button class="btn-outline-dn" data-bs-dismiss="modal">Cerrar</button>
@@ -1320,20 +1419,31 @@ function eliminarTecnico(id) {
 // ══════════════════════════════════════════════
 function renderMisTareas() {
   const lista=DB.tareas.filter(t=>t.tecId===currentUser.id);
-  document.getElementById('misTareasLista').innerHTML=lista.length?lista.map(t=>`
-    <div class="task-card ${t.estado} mb-3">
+  document.getElementById('misTareasLista').innerHTML=lista.length?lista.map(t=>{
+    const ev=t.evidencia;
+    const hasEv=ev&&(ev.fotos?.length||ev.firma||ev.gps);
+    return `<div class="task-card ${t.estado} mb-3">
       <div class="d-flex justify-content-between align-items-start mb-1">
         <div><span style="font-size:.7rem;color:var(--dn-muted);text-transform:uppercase">${t.tipo}</span>
           <div style="font-weight:700;font-size:.92rem">${t.titulo}</div></div>
         <div class="d-flex gap-1">${prioridadBadge(t.prioridad)} ${estadoBadge(t.estado)}</div>
       </div>
       <div style="font-size:.82rem;color:var(--dn-muted);margin-bottom:.6rem">${t.desc}</div>
+      ${hasEv?`<div class="d-flex gap-2 flex-wrap mb-2" style="font-size:.75rem">
+        ${ev.gps?`<span class="badge-dn badge-info"><i class="fas fa-map-marker-alt me-1"></i>GPS</span>`:''}
+        ${ev.fotos?.length?`<span class="badge-dn badge-purple"><i class="fas fa-camera me-1"></i>${ev.fotos.length} foto(s)</span>`:''}
+        ${ev.firma?`<span class="badge-dn badge-ok"><i class="fas fa-signature me-1"></i>Firmado</span>`:''}
+      </div>`:''}
       <div class="d-flex gap-2 align-items-center flex-wrap">
         <span style="font-size:.78rem"><i class="fas fa-calendar me-1"></i>${fmtFecha(t.fecha)}</span>
-        ${t.estado==='pendiente'?`<button class="btn-cyan-dn" style="font-size:.78rem;padding:4px 12px" onclick="cambiarEstadoTareaT('${t.id}','en_progreso')"><i class="fas fa-play me-1"></i>Iniciar</button>`:''}
-        ${t.estado==='en_progreso'?`<button class="btn-primary-dn" style="font-size:.78rem;padding:4px 12px" onclick="cambiarEstadoTareaT('${t.id}','completada')"><i class="fas fa-check me-1"></i>Finalizar</button>`:''}
+        ${t.estado!=='completada'&&t.estado!=='cancelada'?
+          `<button class="btn-primary-dn" style="font-size:.78rem;padding:5px 14px" onclick="abrirEjecutar('${t.id}')">
+            <i class="fas fa-${t.estado==='en_progreso'?'check':'play'} me-1"></i>${t.estado==='en_progreso'?'Finalizar':'Ejecutar'}
+          </button>`:''}
+        ${hasEv?`<button class="btn-outline-dn" style="font-size:.75rem;padding:4px 10px" onclick="verEvidencia('${t.id}')"><i class="fas fa-eye me-1"></i>Evidencia</button>`:''}
       </div>
-    </div>`).join(''):'<div class="empty-state"><i class="fas fa-tasks"></i>No tienes tareas asignadas</div>';
+    </div>`;
+  }).join(''):'<div class="empty-state"><i class="fas fa-tasks"></i>No tienes tareas asignadas</div>';
 }
 function cambiarEstadoTareaT(id,estado) {
   const t=getTarea(id); if(!t) return;
@@ -1406,6 +1516,248 @@ function renderAlertas() {
   document.getElementById('alertasBody').innerHTML=alertas.length?
     alertas.map(a=>`<div class="alert-dn alert-${a.tipo}"><i class="fas fa-${a.icon} me-1"></i><div>${a.msg}</div></div>`).join(''):
     '<div class="empty-state"><i class="fas fa-shield-alt text-success"></i>Sin alertas activas</div>';
+}
+
+// ══════════════════════════════════════════════
+//  EJECUTAR ORDEN — GPS / FOTOS / FIRMA
+// ══════════════════════════════════════════════
+let ejTareaId = null;
+let ejFotos = [];
+let sigCanvas, sigCtx, sigDibujando = false, sigTieneFirma = false;
+
+function abrirEjecutar(tareaId) {
+  ejTareaId = tareaId;
+  ejFotos = [];
+  sigTieneFirma = false;
+  const t = getTarea(tareaId);
+
+  // Info tarea
+  document.getElementById('ejTareaInfo').innerHTML = `
+    <div class="d-flex justify-content-between align-items-start">
+      <div>
+        <div style="font-weight:700;font-size:.95rem">${t.titulo}</div>
+        <div style="font-size:.8rem;color:var(--dn-muted)">${t.tipo} · ${fmtFecha(t.fecha)}</div>
+        <div style="font-size:.82rem;margin-top:.3rem">${t.desc||''}</div>
+      </div>
+      ${estadoBadge(t.estado)}
+    </div>`;
+
+  // Estado sugerido
+  document.getElementById('ejEstado').value = t.estado === 'en_progreso' ? 'completada' : 'en_progreso';
+  document.getElementById('ejNotas').value = '';
+  document.getElementById('photoGrid').innerHTML = '';
+  document.getElementById('sigStatus').textContent = '';
+
+  // Abrir modal
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEjecutar')).show();
+
+  // Init canvas firma
+  setTimeout(() => {
+    initSignatureCanvas();
+  }, 300);
+
+  // GPS
+  capturarGPS();
+}
+
+// ── SIGNATURE PAD ──
+function initSignatureCanvas() {
+  sigCanvas = document.getElementById('signatureCanvas');
+  sigCtx = sigCanvas.getContext('2d');
+  // Ajustar resolución real
+  const rect = sigCanvas.getBoundingClientRect();
+  sigCanvas.width = rect.width * window.devicePixelRatio;
+  sigCanvas.height = 160 * window.devicePixelRatio;
+  sigCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  sigCtx.strokeStyle = '#0d2137';
+  sigCtx.lineWidth = 2.5;
+  sigCtx.lineCap = 'round';
+  sigCtx.lineJoin = 'round';
+  limpiarFirma();
+
+  // Eventos touch
+  sigCanvas.addEventListener('touchstart', sigStart, { passive: false });
+  sigCanvas.addEventListener('touchmove',  sigMove,  { passive: false });
+  sigCanvas.addEventListener('touchend',   sigEnd);
+  // Eventos mouse
+  sigCanvas.addEventListener('mousedown', e => sigStart(e));
+  sigCanvas.addEventListener('mousemove', e => { if(sigDibujando) sigMove(e); });
+  sigCanvas.addEventListener('mouseup',   sigEnd);
+  sigCanvas.addEventListener('mouseleave',sigEnd);
+}
+
+function getSigPos(e) {
+  const rect = sigCanvas.getBoundingClientRect();
+  const src = e.touches ? e.touches[0] : e;
+  return { x: src.clientX - rect.left, y: src.clientY - rect.top };
+}
+function sigStart(e) {
+  e.preventDefault();
+  sigDibujando = true;
+  const p = getSigPos(e);
+  sigCtx.beginPath();
+  sigCtx.moveTo(p.x, p.y);
+}
+function sigMove(e) {
+  e.preventDefault();
+  if (!sigDibujando) return;
+  const p = getSigPos(e);
+  sigCtx.lineTo(p.x, p.y);
+  sigCtx.stroke();
+  sigTieneFirma = true;
+  document.getElementById('sigStatus').textContent = '✓ Firma capturada';
+  document.getElementById('sigStatus').style.color = 'var(--dn-success)';
+}
+function sigEnd() { sigDibujando = false; }
+function limpiarFirma() {
+  if (!sigCtx) return;
+  const rect = sigCanvas.getBoundingClientRect();
+  sigCtx.clearRect(0, 0, rect.width, 160);
+  sigCtx.fillStyle = '#f8fafc';
+  sigCtx.fillRect(0, 0, rect.width, 160);
+  sigTieneFirma = false;
+  document.getElementById('sigStatus').textContent = '';
+}
+
+// ── GPS ──
+function capturarGPS() {
+  const box = document.getElementById('gpsBox');
+  document.getElementById('ejLat').value = '';
+  document.getElementById('ejLng').value = '';
+  box.className = 'gps-box';
+  box.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Obteniendo ubicación...';
+
+  if (!navigator.geolocation) {
+    box.className = 'gps-box error';
+    box.innerHTML = '<i class="fas fa-times-circle text-warning"></i> GPS no disponible en este dispositivo';
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const acc = Math.round(pos.coords.accuracy);
+      document.getElementById('ejLat').value = lat;
+      document.getElementById('ejLng').value = lng;
+      box.className = 'gps-box';
+      box.innerHTML = `<i class="fas fa-map-marker-alt text-danger"></i>
+        <div>
+          <div style="font-weight:700;font-size:.85rem">Ubicación capturada ✓</div>
+          <div style="font-size:.75rem">${lat.toFixed(6)}, ${lng.toFixed(6)}</div>
+          <div style="font-size:.72rem;color:var(--dn-muted)">Precisión: ~${acc}m &nbsp;
+          <a href="https://maps.google.com/?q=${lat},${lng}" target="_blank" style="color:var(--dn-blue)">Ver en mapa <i class="fas fa-external-link-alt"></i></a></div>
+        </div>`;
+    },
+    err => {
+      box.className = 'gps-box error';
+      const msgs = { 1:'Permiso de ubicación denegado', 2:'Señal GPS no disponible', 3:'Tiempo de espera agotado' };
+      box.innerHTML = `<i class="fas fa-exclamation-triangle text-warning"></i>
+        <div>
+          <div style="font-weight:600;font-size:.83rem">${msgs[err.code]||'Error GPS'}</div>
+          <button class="btn-outline-dn" style="font-size:.75rem;padding:3px 8px;margin-top:4px" onclick="capturarGPS()"><i class="fas fa-redo me-1"></i>Reintentar</button>
+        </div>`;
+    },
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+  );
+}
+
+// ── FOTOS ──
+function agregarFotos(input) {
+  const files = Array.from(input.files);
+  const grid = document.getElementById('photoGrid');
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const b64 = e.target.result;
+      ejFotos.push(b64);
+      const idx = ejFotos.length - 1;
+      const div = document.createElement('div');
+      div.className = 'photo-thumb';
+      div.innerHTML = `<img src="${b64}"><button class="del-photo" onclick="eliminarFoto(${idx},this.parentElement)"><i class="fas fa-times"></i></button>`;
+      grid.appendChild(div);
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value = '';
+}
+function eliminarFoto(idx, el) {
+  ejFotos.splice(idx, 1);
+  el.remove();
+  // Re-index buttons
+  document.querySelectorAll('#photoGrid .del-photo').forEach((btn, i) => {
+    btn.setAttribute('onclick', `eliminarFoto(${i},this.parentElement)`);
+  });
+}
+
+// ── GUARDAR EJECUCIÓN ──
+function guardarEjecucion() {
+  const t = getTarea(ejTareaId);
+  if (!t) return;
+  const lat = document.getElementById('ejLat').value;
+  const lng = document.getElementById('ejLng').value;
+  const notas = document.getElementById('ejNotas').value.trim();
+  const estado = document.getElementById('ejEstado').value;
+
+  // Capturar firma
+  let firmaB64 = null;
+  if (sigTieneFirma && sigCanvas) {
+    firmaB64 = sigCanvas.toDataURL('image/png');
+  }
+
+  // Construir evidencia
+  t.evidencia = {
+    fecha: new Date().toLocaleString('es-CO'),
+    gps: lat && lng ? { lat: parseFloat(lat), lng: parseFloat(lng) } : null,
+    fotos: [...ejFotos],
+    firma: firmaB64,
+    notas,
+    tecnico: currentUser.nombre
+  };
+  t.estado = estado;
+
+  addActividad('tarea',
+    `${currentUser.nombre} ejecutó "${t.titulo}" ${ejFotos.length?`📷${ejFotos.length}foto(s)`:''} ${firmaB64?'✍️firmado':''}`,
+    'clipboard-check', estado==='completada'?'green':'cyan'
+  );
+  saveDB();
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEjecutar')).hide();
+  renderMisTareas();
+  toast(`Orden registrada con evidencia${firmaB64?' y firma':''} ✓`);
+}
+
+// ── VER EVIDENCIA ──
+function verEvidencia(tareaId) {
+  const t = getTarea(tareaId);
+  const ev = t?.evidencia;
+  if (!ev) return;
+  const tec = getTecnico(t.tecId);
+  document.getElementById('modalTareaDetalleBody').innerHTML = `
+    <div class="mb-3"><h6 class="fw-bold">${t.titulo}</h6>${estadoBadge(t.estado)}</div>
+    <div class="evidencia-section">
+      <div class="ev-title"><i class="fas fa-file-image me-1"></i>Evidencia — ${ev.fecha||''}</div>
+      <div style="font-size:.82rem;margin-bottom:.4rem"><i class="fas fa-hard-hat me-1 text-primary"></i>${ev.tecnico||tec?.nombre||'—'}</div>
+      ${ev.notas?`<div style="font-size:.85rem;margin-bottom:.6rem"><b>Notas:</b> ${ev.notas}</div>`:''}
+      ${ev.gps?`<div class="gps-box mb-3">
+        <i class="fas fa-map-marker-alt text-danger"></i>
+        <div><div style="font-weight:600;font-size:.83rem">Ubicación GPS</div>
+        <div style="font-size:.75rem">${ev.gps.lat.toFixed(6)}, ${ev.gps.lng.toFixed(6)}</div>
+        <a href="https://maps.google.com/?q=${ev.gps.lat},${ev.gps.lng}" target="_blank" style="font-size:.75rem;color:var(--dn-blue)"><i class="fas fa-map me-1"></i>Abrir en Google Maps</a></div>
+      </div>`:'<div class="text-muted" style="font-size:.8rem;margin-bottom:.5rem"><i class="fas fa-map-marker-alt me-1"></i>Sin ubicación GPS</div>'}
+      ${ev.fotos?.length?`<div class="ev-title"><i class="fas fa-camera me-1"></i>Fotos (${ev.fotos.length})</div>
+        <div class="ev-photo-grid mb-3">${ev.fotos.map(f=>`<img src="${f}" onclick="verFotoGrande('${f}')">`).join('')}</div>`
+        :'<div class="text-muted" style="font-size:.8rem;margin-bottom:.5rem"><i class="fas fa-camera me-1"></i>Sin fotos</div>'}
+      ${ev.firma?`<div class="ev-title"><i class="fas fa-signature me-1"></i>Firma del cliente</div>
+        <img class="ev-sig-img" src="${ev.firma}">`
+        :'<div class="text-muted" style="font-size:.8rem"><i class="fas fa-signature me-1"></i>Sin firma</div>'}
+    </div>`;
+  document.getElementById('modalTareaDetalleFooter').innerHTML = '<button class="btn-outline-dn" data-bs-dismiss="modal">Cerrar</button>';
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('modalTareaDetalle')).show();
+}
+
+function verFotoGrande(src) {
+  const win = window.open('', '_blank');
+  win.document.write(`<html><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh">
+    <img src="${src}" style="max-width:100%;max-height:100vh;object-fit:contain"></body></html>`);
 }
 
 // ══════════════════════════════════════════════
