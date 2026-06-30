@@ -18,6 +18,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
   :root {
     --dn-blue: #0d47a1;
@@ -709,15 +710,140 @@
         </div>
       </div>
 
-      <!-- BODEGAS POR TÉCNICO -->
+      <!-- BODEGAS — INVENTARIO REAL -->
       <div id="sec-bodegas" class="section-page">
-        <div class="panel mb-3">
-          <div class="panel-header">
-            <h6><i class="fas fa-warehouse me-2"></i>Bodega por Técnico — Material en Custodia</h6>
-            <button class="btn-cyan-dn" style="font-size:.8rem;padding:5px 12px" onclick="renderBodegas()"><i class="fas fa-sync me-1"></i>Actualizar</button>
+        <!-- KPIs inventario global -->
+        <div class="row g-2 mb-3" id="bodegasKpis"></div>
+        <!-- Tabs -->
+        <div class="d-flex gap-2 mb-3 flex-wrap">
+          <button class="btn-outline-dn active" onclick="switchBodegaTab('principal',this)"><i class="fas fa-warehouse me-1"></i>Bodega Principal</button>
+          <button class="btn-outline-dn" onclick="switchBodegaTab('tecnicos',this)"><i class="fas fa-hard-hat me-1"></i>Por Técnico</button>
+          <button class="btn-outline-dn" onclick="switchBodegaTab('equipos',this)"><i class="fas fa-barcode me-1"></i>Equipos Serializados</button>
+        </div>
+        <!-- Tab Principal -->
+        <div id="bodegaTabPrincipal">
+          <div class="panel">
+            <div class="panel-header"><h6><i class="fas fa-boxes-stacked me-2"></i>Stock Bodega Central</h6></div>
+            <div class="table-wrapper">
+              <table class="table-dn">
+                <thead><tr><th>Código</th><th>Material</th><th>Categoría</th><th>Stock</th><th>Con Técnicos</th><th>Total Real</th><th>Mín</th><th>Estado</th></tr></thead>
+                <tbody id="bodegaPrincipalBody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
-        <div id="bodegasGrid"></div>
+        <!-- Tab Técnicos -->
+        <div id="bodegaTabTecnicos" style="display:none">
+          <div id="bodegasGrid"></div>
+        </div>
+        <!-- Tab Equipos -->
+        <div id="bodegaTabEquipos" style="display:none">
+          <div class="panel mb-3">
+            <div class="panel-header">
+              <h6><i class="fas fa-barcode me-2"></i>Equipos Serializados</h6>
+              <div class="d-flex gap-2">
+                <button class="btn-cyan-dn" style="font-size:.8rem;padding:5px 12px" onclick="abrirScannerEquipo()"><i class="fas fa-qrcode me-1"></i>Escanear / Agregar</button>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="row g-2 mb-2">
+                <div class="col-6 col-md-3">
+                  <select id="filtEqMat" class="form-select" onchange="renderEquipos()"><option value="">Todos los tipos</option></select>
+                </div>
+                <div class="col-6 col-md-3">
+                  <select id="filtEqEstado" class="form-select" onchange="renderEquipos()">
+                    <option value="">Todos los estados</option>
+                    <option value="bodega">En Bodega</option>
+                    <option value="asignado">Asignado a Técnico</option>
+                    <option value="instalado">Instalado en cliente</option>
+                    <option value="dañado">Dañado / Baja</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="table-wrapper">
+              <table class="table-dn">
+                <thead><tr><th>Tipo</th><th>Serial</th><th>MAC</th><th>Estado</th><th>Ubicación</th><th>Ingreso</th><th>Obs.</th><th></th></tr></thead>
+                <tbody id="equiposBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODAL EQUIPO (agregar/escanear) -->
+      <div class="modal fade" id="modalEquipo" tabindex="-1">
+        <div class="modal-dialog modal-fullscreen-sm-down">
+          <div class="modal-content">
+            <div class="modal-header" style="background:linear-gradient(135deg,var(--dn-blue),#1565c0);color:#fff">
+              <h5 class="modal-title text-white"><i class="fas fa-barcode me-2"></i>Registrar Equipo</h5>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <!-- Scanner -->
+              <div class="mb-3">
+                <label class="form-label"><i class="fas fa-camera me-1"></i>Escanear código de barras / QR</label>
+                <div id="scannerContainer" style="border-radius:10px;overflow:hidden;background:#000;max-height:250px"></div>
+                <div class="d-flex gap-2 mt-2">
+                  <button class="btn-primary-dn" style="font-size:.82rem" onclick="iniciarScanner()"><i class="fas fa-qrcode me-1"></i>Abrir cámara</button>
+                  <button class="btn-outline-dn" style="font-size:.82rem" onclick="detenerScanner()"><i class="fas fa-stop me-1"></i>Detener</button>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Tipo de equipo</label>
+                <select id="eqMat" class="form-select"><option value="">Selecciona tipo...</option></select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Número de serie <span class="text-danger">*</span></label>
+                <input id="eqSerial" type="text" class="form-control" placeholder="Ej: HWTC1234567890" style="font-family:monospace">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Dirección MAC (opcional)</label>
+                <input id="eqMac" type="text" class="form-control" placeholder="Ej: 48:AD:08:11:22:33" style="font-family:monospace">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Observaciones</label>
+                <input id="eqObs" type="text" class="form-control" placeholder="Notas adicionales">
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn-outline-dn" data-bs-dismiss="modal">Cancelar</button>
+              <button class="btn-primary-dn" onclick="guardarEquipo()"><i class="fas fa-save me-1"></i>Registrar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODAL ASIGNAR EQUIPO A TÉCNICO -->
+      <div class="modal fade" id="modalAsignarEquipo" tabindex="-1">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title"><i class="fas fa-hand-holding-box me-2"></i>Asignar Equipo</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" id="asigEqId">
+              <div id="asigEqInfo" class="mb-3 p-3" style="background:#f0f4f8;border-radius:8px;font-size:.85rem"></div>
+              <div class="mb-3">
+                <label class="form-label">Asignar a Técnico</label>
+                <select id="asigEqTec" class="form-select"><option value="">Selecciona técnico...</option></select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Tarea (opcional)</label>
+                <select id="asigEqTarea" class="form-select"><option value="">Sin tarea específica</option></select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Cliente (si aplica)</label>
+                <input id="asigEqCliente" type="text" class="form-control" placeholder="Nombre del cliente">
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn-outline-dn" data-bs-dismiss="modal">Cancelar</button>
+              <button class="btn-primary-dn" onclick="confirmarAsignarEquipo()"><i class="fas fa-check me-1"></i>Asignar</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- FIREBASE CONFIG -->
@@ -946,17 +1072,11 @@ let currentUser = null;
 let chartConsumo, chartDescargos, chartPorTec;
 const CATEGORIAS = { ftth:'FTTH', equipos:'Equipos', herramientas:'Herramientas', consumibles:'Consumibles' };
 
-let fbApp = null, fbDB = null, fbRef = null, fbUnsubscribe = null;
-const FB_KEY = 'dukenet_fb_config';
 
 function loadDB() {
   const raw = localStorage.getItem(KEY);
   if (raw) { DB = JSON.parse(raw); } else { initDefaultDB(); }
-  // Try to connect Firebase after loading local data
-  const fbCfg = localStorage.getItem(FB_KEY);
-  if (fbCfg) {
-    try { initFirebase(JSON.parse(fbCfg)); } catch(e) { console.warn('Firebase init error:', e); }
-  }
+  // Firebase conectado al cargar si hay config
 }
 function saveDB() {
   localStorage.setItem(KEY, JSON.stringify(DB));
@@ -1004,6 +1124,11 @@ function initDefaultDB() {
       { id:'d1', fecha:'2026-06-22', tecId:'u3', matId:'m1', asigId:'a1', cantidad:70,  tipo:'uso',  obs:'Tendido 70m cliente García Zona Norte' },
       { id:'d2', fecha:'2026-06-24', tecId:'u4', matId:'m1', asigId:'a4', cantidad:100, tipo:'uso',  obs:'Instalación Bloque 4 Zona Sur' },
     ],
+    equipos: [
+      { id:'eq1', matId:'m7', serial:'HWTC1A2B3C4D', mac:'48:AD:08:11:22:33', estado:'bodega',   tecId:null, tareaId:null, cliente:'', fechaIngreso:'2026-06-01', obs:'ONT Huawei' },
+      { id:'eq2', matId:'m7', serial:'HWTC5E6F7G8H', mac:'48:AD:08:44:55:66', estado:'asignado', tecId:'u3', tareaId:'t1', cliente:'', fechaIngreso:'2026-06-01', obs:'' },
+      { id:'eq3', matId:'m9', serial:'TPLINK-AC001', mac:'A0:B1:C2:D3:E4:F5', estado:'bodega',   tecId:null, tareaId:null, cliente:'', fechaIngreso:'2026-06-05', obs:'Router WiFi' },
+    ],
     tareas: [
       { id:'t1', tipo:'Instalación FTTH', titulo:'Inst. Luis Martínez - Zona Norte', desc:'Calle 12 #45 apto 302. Requiere tendido 80m fibra.', tecId:'u3', prioridad:'alta',  fecha:'2026-06-21', estado:'en_progreso' },
       { id:'t2', tipo:'Instalación FTTH', titulo:'Inst. Bloque Las Palmas',           desc:'4 clientes nuevos Bloque Las Palmas Zona Sur.',       tecId:'u4', prioridad:'media', fecha:'2026-06-22', estado:'completada'  },
@@ -1032,11 +1157,21 @@ function fillDemo(u, p) {
 function doLogin() {
   const u = document.getElementById('loginUser').value.trim();
   const p = document.getElementById('loginPass').value;
-  const user = DB.usuarios.find(x => x.user === u && x.pass === p);
-  if (!user) {
-    document.getElementById('loginAlert').innerHTML = '<div class="alert-dn alert-danger"><i class="fas fa-times-circle"></i> Usuario o contraseña incorrectos.</div>';
+  // Verificar bloqueo
+  const blocked = checkLoginSecurity();
+  if (blocked) {
+    document.getElementById('loginAlert').innerHTML = `<div class="alert-dn alert-danger"><i class="fas fa-lock me-1"></i>${blocked}</div>`;
     return;
   }
+  const user = DB.usuarios.find(x => x.user === u && x.pass === p);
+  if (!user) {
+    registerLoginAttempt(false);
+    const s = getSec();
+    const remaining = 5 - (s.failCount || 0);
+    document.getElementById('loginAlert').innerHTML = `<div class="alert-dn alert-danger"><i class="fas fa-times-circle"></i> Credenciales incorrectas. ${remaining > 0 ? remaining+' intento(s) restante(s).' : ''}</div>`;
+    return;
+  }
+  registerLoginAttempt(true);
   currentUser = user;
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('appShell').style.display = 'block';
@@ -1178,7 +1313,7 @@ function showSection(sec) {
     'mis-asignaciones':  renderMisAsignaciones,
     'reportes':          () => { populateReportes(); renderReporte(); },
     'alertas':           renderAlertas,
-    'bodegas':           renderBodegas,
+    'bodegas':           renderInventarioReal,
     'firebase-config':   renderFirebaseConfig,
   };
   if (renders[sec]) renders[sec]();
@@ -1851,6 +1986,7 @@ function renderGraficas(desc) {
   },options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false},title:{display:true,text:'Top Materiales Consumidos'}},scales:{x:{beginAtZero:true}}}});
 }
 
+
 function exportarCSV() {
   const desc = getDescFiltrados();
   const desde = document.getElementById('repFechaDesde').value || 'inicio';
@@ -1867,8 +2003,7 @@ function exportarCSV() {
   csv += `=== CONSOLIDADO POR MATERIAL ===\n`;
   csv += `Código,Material,Categoría,Unidad,Usado,Devuelto,Pérdida,Neto consumido\n`;
   Object.entries(mapa).forEach(([id,v])=>{
-    const m=getMaterial(id);
-    if(!m) return;
+    const m=getMaterial(id); if(!m) return;
     csv+=`"${m.cod}","${m.nombre}","${CATEGORIAS[m.cat]||m.cat}","${m.unidad}",${v.uso},${v.dev},${v.perd},${v.uso-v.dev}\n`;
   });
   csv += `\n=== DETALLE DE MOVIMIENTOS ===\n`;
@@ -1910,24 +2045,19 @@ let ejFotos = [];
 let sigCanvas, sigCtx, sigDibujando = false, sigTieneFirma = false;
 
 function abrirEjecutar(tareaId) {
-  ejTareaId = tareaId;
-  ejFotos = [];
-  sigTieneFirma = false;
+  ejTareaId = tareaId; ejFotos = []; sigTieneFirma = false;
   const t = getTarea(tareaId);
   document.getElementById('ejTareaInfo').innerHTML = `
     <div class="d-flex justify-content-between align-items-start">
-      <div>
-        <div style="font-weight:700;font-size:.95rem">${t.titulo}</div>
-        <div style="font-size:.8rem;color:var(--dn-muted)">${t.tipo} · ${fmtFecha(t.fecha)}</div>
-        <div style="font-size:.82rem;margin-top:.3rem">${t.desc||''}</div>
-      </div>
+      <div><div style="font-weight:700;font-size:.95rem">${t.titulo}</div>
+      <div style="font-size:.8rem;color:var(--dn-muted)">${t.tipo} · ${fmtFecha(t.fecha)}</div>
+      <div style="font-size:.82rem;margin-top:.3rem">${t.desc||''}</div></div>
       ${estadoBadge(t.estado)}
     </div>`;
   document.getElementById('ejEstado').value = t.estado === 'en_progreso' ? 'completada' : 'en_progreso';
   document.getElementById('ejNotas').value = '';
   document.getElementById('photoGrid').innerHTML = '';
   document.getElementById('sigStatus').textContent = '';
-  // Cargar lista de material de la tarea
   cargarMaterialEjecutar(tareaId);
   bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEjecutar')).show();
   setTimeout(() => { initSignatureCanvas(); }, 300);
@@ -1941,10 +2071,8 @@ function initSignatureCanvas() {
   sigCanvas.width = rect.width * window.devicePixelRatio;
   sigCanvas.height = 160 * window.devicePixelRatio;
   sigCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
-  sigCtx.strokeStyle = '#0d2137';
-  sigCtx.lineWidth = 2.5;
-  sigCtx.lineCap = 'round';
-  sigCtx.lineJoin = 'round';
+  sigCtx.strokeStyle = '#0d2137'; sigCtx.lineWidth = 2.5;
+  sigCtx.lineCap = 'round'; sigCtx.lineJoin = 'round';
   limpiarFirma();
   sigCanvas.addEventListener('touchstart', sigStart, { passive: false });
   sigCanvas.addEventListener('touchmove',  sigMove,  { passive: false });
@@ -1954,397 +2082,479 @@ function initSignatureCanvas() {
   sigCanvas.addEventListener('mouseup',   sigEnd);
   sigCanvas.addEventListener('mouseleave',sigEnd);
 }
-
 function getSigPos(e) {
   const rect = sigCanvas.getBoundingClientRect();
   const src = e.touches ? e.touches[0] : e;
   return { x: src.clientX - rect.left, y: src.clientY - rect.top };
 }
-function sigStart(e) {
-  e.preventDefault();
-  sigDibujando = true;
-  const p = getSigPos(e);
-  sigCtx.beginPath();
-  sigCtx.moveTo(p.x, p.y);
-}
+function sigStart(e) { e.preventDefault(); sigDibujando=true; const p=getSigPos(e); sigCtx.beginPath(); sigCtx.moveTo(p.x,p.y); }
 function sigMove(e) {
-  e.preventDefault();
-  if (!sigDibujando) return;
-  const p = getSigPos(e);
-  sigCtx.lineTo(p.x, p.y);
-  sigCtx.stroke();
-  sigTieneFirma = true;
-  document.getElementById('sigStatus').textContent = 'Firma capturada';
-  document.getElementById('sigStatus').style.color = 'var(--dn-success)';
+  e.preventDefault(); if(!sigDibujando) return;
+  const p=getSigPos(e); sigCtx.lineTo(p.x,p.y); sigCtx.stroke();
+  sigTieneFirma=true;
+  document.getElementById('sigStatus').textContent='Firma capturada';
+  document.getElementById('sigStatus').style.color='var(--dn-success)';
 }
-function sigEnd() { sigDibujando = false; }
+function sigEnd() { sigDibujando=false; }
 function limpiarFirma() {
-  if (!sigCtx) return;
-  const rect = sigCanvas.getBoundingClientRect();
-  sigCtx.clearRect(0, 0, rect.width, 160);
-  sigCtx.fillStyle = '#f8fafc';
-  sigCtx.fillRect(0, 0, rect.width, 160);
-  sigTieneFirma = false;
-  const el = document.getElementById('sigStatus');
-  if (el) el.textContent = '';
+  if(!sigCtx) return;
+  const rect=sigCanvas.getBoundingClientRect();
+  sigCtx.clearRect(0,0,rect.width,160);
+  sigCtx.fillStyle='#f8fafc'; sigCtx.fillRect(0,0,rect.width,160);
+  sigTieneFirma=false;
+  const el=document.getElementById('sigStatus'); if(el) el.textContent='';
 }
 
 function capturarGPS() {
-  const box = document.getElementById('gpsBox');
-  document.getElementById('ejLat').value = '';
-  document.getElementById('ejLng').value = '';
-  box.className = 'gps-box';
-  box.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Obteniendo ubicación...';
-  if (!navigator.geolocation) {
-    box.className = 'gps-box error';
-    box.innerHTML = '<i class="fas fa-times-circle text-warning"></i> GPS no disponible en este dispositivo';
-    return;
-  }
+  const box=document.getElementById('gpsBox');
+  document.getElementById('ejLat').value=''; document.getElementById('ejLng').value='';
+  box.className='gps-box';
+  box.innerHTML='<i class="fas fa-spinner fa-spin"></i> Obteniendo ubicación...';
+  if(!navigator.geolocation){ box.innerHTML='<i class="fas fa-times-circle text-warning"></i> GPS no disponible'; return; }
   navigator.geolocation.getCurrentPosition(
-    pos => {
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      const acc = Math.round(pos.coords.accuracy);
-      document.getElementById('ejLat').value = lat;
-      document.getElementById('ejLng').value = lng;
-      box.className = 'gps-box';
-      box.innerHTML = `<i class="fas fa-map-marker-alt text-danger"></i>
-        <div>
-          <div style="font-weight:700;font-size:.85rem">Ubicación capturada</div>
-          <div style="font-size:.75rem">${lat.toFixed(6)}, ${lng.toFixed(6)}</div>
-          <div style="font-size:.72rem;color:var(--dn-muted)">Precisión: ~${acc}m &nbsp;
-          <a href="https://maps.google.com/?q=${lat},${lng}" target="_blank" style="color:var(--dn-blue)">Ver en mapa <i class="fas fa-external-link-alt"></i></a></div>
-        </div>`;
+    pos=>{
+      const lat=pos.coords.latitude, lng=pos.coords.longitude, acc=Math.round(pos.coords.accuracy);
+      document.getElementById('ejLat').value=lat; document.getElementById('ejLng').value=lng;
+      box.innerHTML=`<i class="fas fa-map-marker-alt text-danger"></i>
+        <div><div style="font-weight:700;font-size:.85rem">Ubicación capturada</div>
+        <div style="font-size:.75rem">${lat.toFixed(6)}, ${lng.toFixed(6)}</div>
+        <div style="font-size:.72rem;color:var(--dn-muted)">Precisión: ~${acc}m &nbsp;
+        <a href="https://maps.google.com/?q=${lat},${lng}" target="_blank" style="color:var(--dn-blue)">Ver mapa <i class="fas fa-external-link-alt"></i></a></div></div>`;
     },
-    err => {
-      box.className = 'gps-box error';
-      const msgs = { 1:'Permiso de ubicación denegado', 2:'Señal GPS no disponible', 3:'Tiempo de espera agotado' };
-      box.innerHTML = `<i class="fas fa-exclamation-triangle text-warning"></i>
-        <div>
-          <div style="font-weight:600;font-size:.83rem">${msgs[err.code]||'Error GPS'}</div>
-          <button class="btn-outline-dn" style="font-size:.75rem;padding:3px 8px;margin-top:4px" onclick="capturarGPS()"><i class="fas fa-redo me-1"></i>Reintentar</button>
-        </div>`;
+    err=>{
+      const msgs={1:'Permiso denegado',2:'Señal no disponible',3:'Tiempo agotado'};
+      box.innerHTML=`<i class="fas fa-exclamation-triangle text-warning"></i>
+        <div><div style="font-weight:600;font-size:.83rem">${msgs[err.code]||'Error GPS'}</div>
+        <button class="btn-outline-dn" style="font-size:.75rem;padding:3px 8px;margin-top:4px" onclick="capturarGPS()"><i class="fas fa-redo me-1"></i>Reintentar</button></div>`;
     },
-    { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    {enableHighAccuracy:true,timeout:12000,maximumAge:0}
   );
 }
 
 function agregarFotos(input) {
-  const files = Array.from(input.files);
-  const grid = document.getElementById('photoGrid');
-  files.forEach(file => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const b64 = e.target.result;
-      ejFotos.push(b64);
-      const idx = ejFotos.length - 1;
-      const div = document.createElement('div');
-      div.className = 'photo-thumb';
-      div.innerHTML = `<img src="${b64}"><button class="del-photo" onclick="eliminarFoto(${idx},this.parentElement)"><i class="fas fa-times"></i></button>`;
+  const files=Array.from(input.files), grid=document.getElementById('photoGrid');
+  files.forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const b64=e.target.result; ejFotos.push(b64);
+      const idx=ejFotos.length-1, div=document.createElement('div');
+      div.className='photo-thumb';
+      div.innerHTML=`<img src="${b64}"><button class="del-photo" onclick="eliminarFoto(${idx},this.parentElement)"><i class="fas fa-times"></i></button>`;
       grid.appendChild(div);
     };
     reader.readAsDataURL(file);
   });
-  input.value = '';
+  input.value='';
 }
-function eliminarFoto(idx, el) {
-  ejFotos.splice(idx, 1);
-  el.remove();
-  document.querySelectorAll('#photoGrid .del-photo').forEach((btn, i) => {
-    btn.setAttribute('onclick', `eliminarFoto(${i},this.parentElement)`);
-  });
+function eliminarFoto(idx,el) {
+  ejFotos.splice(idx,1); el.remove();
+  document.querySelectorAll('#photoGrid .del-photo').forEach((btn,i)=>btn.setAttribute('onclick',`eliminarFoto(${i},this.parentElement)`));
+}
+
+function cargarMaterialEjecutar(tareaId) {
+  const asigs=DB.asignaciones.filter(a=>a.tareaId===tareaId&&a.pendiente>0);
+  const lista=document.getElementById('ejMaterialLista');
+  if(!asigs.length){ lista.innerHTML='<div style="padding:.75rem 1rem;font-size:.83rem;color:var(--dn-muted)"><i class="fas fa-box-open me-1"></i>Sin material asignado a esta tarea</div>'; return; }
+  lista.innerHTML=asigs.map((a)=>{
+    const m=getMaterial(a.matId);
+    return `<div style="padding:.65rem 1rem;border-bottom:1px solid var(--dn-border);display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+      <div style="flex:1;min-width:150px"><div style="font-weight:600;font-size:.85rem">${m?.nombre||'—'}</div>
+      <div style="font-size:.75rem;color:var(--dn-muted)">Pendiente: <b>${a.pendiente} ${m?.unidad||''}</b></div></div>
+      <div style="display:flex;align-items:center;gap:.5rem">
+        <label style="font-size:.8rem;white-space:nowrap">Cant. usada:</label>
+        <input type="number" class="form-control" id="ejMat_${a.id}" min="0" max="${a.pendiente}" value="${a.pendiente}"
+          style="width:80px;font-size:.85rem;padding:.25rem .5rem" inputmode="numeric">
+        <span style="font-size:.78rem;color:var(--dn-muted)">${m?.unidad||''}</span>
+      </div>
+      <select class="form-select" id="ejMatTipo_${a.id}" style="font-size:.78rem;padding:.25rem .5rem;width:120px">
+        <option value="uso">Uso en obra</option>
+        <option value="devolucion">Devolución</option>
+        <option value="perdida">Pérdida/Daño</option>
+      </select>
+    </div>`;
+  }).join('');
 }
 
 function guardarEjecucion() {
-  const t = getTarea(ejTareaId);
-  if (!t) return;
-  const lat    = document.getElementById('ejLat').value;
-  const lng    = document.getElementById('ejLng').value;
-  const notas  = document.getElementById('ejNotas').value.trim();
-  const estado = document.getElementById('ejEstado').value;
-  let firmaB64 = null;
-  if (sigTieneFirma && sigCanvas) { firmaB64 = sigCanvas.toDataURL('image/png'); }
-
-  // ── Procesar descargos de material ──
-  const asigs = DB.asignaciones.filter(a => a.tareaId === ejTareaId && a.pendiente > 0);
-  let descargados = 0;
-  const hoy = new Date().toISOString().slice(0,10);
-  asigs.forEach(a => {
-    const input = document.getElementById(`ejMat_${a.id}`);
-    const tipoSel = document.getElementById(`ejMatTipo_${a.id}`);
-    if (!input) return;
-    const cant = Math.min(parseInt(input.value) || 0, a.pendiente);
-    if (cant <= 0) return;
-    const tipo = tipoSel ? tipoSel.value : 'uso';
-    const m = getMaterial(a.matId);
-    // Crear descargo
-    DB.descargos.push({
-      id: uid(), fecha: hoy, tecId: currentUser.id,
-      matId: a.matId, asigId: a.id, cantidad: cant, tipo, obs: `Orden: ${t.titulo}`
-    });
-    // Actualizar pendiente de asignación
-    a.pendiente = Math.max(0, a.pendiente - cant);
-    if (a.pendiente === 0) a.estado = 'descargado';
-    else a.estado = 'parcial';
-    // Actualizar stock del inventario
-    if (tipo === 'devolucion' && m) m.stock += cant;
-    addActividad('descargo',
-      `${currentUser.nombre}: ${cant} ${m?.unidad||''} ${m?.nombre||''} (${tipo})`,
-      'clipboard-check', tipo==='uso'?'green':tipo==='devolucion'?'cyan':'red'
-    );
+  const t=getTarea(ejTareaId); if(!t) return;
+  const lat=document.getElementById('ejLat').value;
+  const lng=document.getElementById('ejLng').value;
+  const notas=document.getElementById('ejNotas').value.trim();
+  const estado=document.getElementById('ejEstado').value;
+  let firmaB64=null;
+  if(sigTieneFirma&&sigCanvas) firmaB64=sigCanvas.toDataURL('image/png');
+  // Procesar descargos
+  const asigs=DB.asignaciones.filter(a=>a.tareaId===ejTareaId&&a.pendiente>0);
+  let descargados=0;
+  const hoy=new Date().toISOString().slice(0,10);
+  asigs.forEach(a=>{
+    const input=document.getElementById(`ejMat_${a.id}`);
+    const tipoSel=document.getElementById(`ejMatTipo_${a.id}`);
+    if(!input) return;
+    const cant=Math.min(parseInt(input.value)||0,a.pendiente);
+    if(cant<=0) return;
+    const tipo=tipoSel?tipoSel.value:'uso';
+    const m=getMaterial(a.matId);
+    DB.descargos.push({id:uid(),fecha:hoy,tecId:currentUser.id,matId:a.matId,asigId:a.id,cantidad:cant,tipo,obs:`Orden: ${t.titulo}`});
+    a.pendiente=Math.max(0,a.pendiente-cant);
+    a.estado=a.pendiente===0?'descargado':'parcial';
+    if(tipo==='devolucion'&&m) m.stock+=cant;
+    addActividad('descargo',`${currentUser.nombre}: ${cant} ${m?.unidad||''} ${m?.nombre||''} (${tipo})`,'clipboard-check',tipo==='uso'?'green':tipo==='devolucion'?'cyan':'red');
     descargados++;
   });
-
-  t.evidencia = {
-    fecha: new Date().toLocaleString('es-CO'),
-    gps: lat && lng ? { lat: parseFloat(lat), lng: parseFloat(lng) } : null,
-    fotos: [...ejFotos],
-    firma: firmaB64,
-    notas,
-    tecnico: currentUser.nombre
-  };
-  t.estado = estado;
-  addActividad('tarea',
-    `${currentUser.nombre} ejecutó "${t.titulo}"${descargados?' — '+descargados+' material(es) descargado(s)':''}`,
-    'clipboard-check', estado==='completada'?'green':'cyan'
-  );
+  t.evidencia={fecha:new Date().toLocaleString('es-CO'),gps:lat&&lng?{lat:parseFloat(lat),lng:parseFloat(lng)}:null,fotos:[...ejFotos],firma:firmaB64,notas,tecnico:currentUser.nombre};
+  t.estado=estado;
+  addActividad('tarea',`${currentUser.nombre} ejecutó "${t.titulo}"${descargados?' — '+descargados+' mat.':''}${ firmaB64?' + firma':''}`,'clipboard-check',estado==='completada'?'green':'cyan');
   saveDB();
   bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEjecutar')).hide();
   renderMisTareas();
-  const msg = `Orden registrada${descargados?' — '+descargados+' material(es) descargado(s)':''}${firmaB64?' + firma':''}`;
-  toast(msg);
+  toast(`Orden registrada${descargados?' — '+descargados+' material(es) descargado(s)':''}${firmaB64?' + firma':''}`);
 }
 
 function verEvidencia(tareaId) {
-  const t = getTarea(tareaId);
-  const ev = t?.evidencia;
-  if (!ev) return;
-  const tec = getTecnico(t.tecId);
-  document.getElementById('modalTareaDetalleBody').innerHTML = `
+  const t=getTarea(tareaId), ev=t?.evidencia; if(!ev) return;
+  const tec=getTecnico(t.tecId);
+  document.getElementById('modalTareaDetalleBody').innerHTML=`
     <div class="mb-3"><h6 class="fw-bold">${t.titulo}</h6>${estadoBadge(t.estado)}</div>
     <div class="evidencia-section">
       <div class="ev-title"><i class="fas fa-file-image me-1"></i>Evidencia — ${ev.fecha||''}</div>
       <div style="font-size:.82rem;margin-bottom:.4rem"><i class="fas fa-hard-hat me-1 text-primary"></i>${ev.tecnico||tec?.nombre||'—'}</div>
       ${ev.notas?`<div style="font-size:.85rem;margin-bottom:.6rem"><b>Notas:</b> ${ev.notas}</div>`:''}
-      ${ev.gps?`<div class="gps-box mb-3">
-        <i class="fas fa-map-marker-alt text-danger"></i>
+      ${ev.gps?`<div class="gps-box mb-3"><i class="fas fa-map-marker-alt text-danger"></i>
         <div><div style="font-weight:600;font-size:.83rem">Ubicación GPS</div>
         <div style="font-size:.75rem">${ev.gps.lat.toFixed(6)}, ${ev.gps.lng.toFixed(6)}</div>
         <a href="https://maps.google.com/?q=${ev.gps.lat},${ev.gps.lng}" target="_blank" style="font-size:.75rem;color:var(--dn-blue)"><i class="fas fa-map me-1"></i>Abrir en Google Maps</a></div>
-      </div>`:'<div class="text-muted" style="font-size:.8rem;margin-bottom:.5rem"><i class="fas fa-map-marker-alt me-1"></i>Sin ubicación GPS</div>'}
+      </div>`:'<div class="text-muted" style="font-size:.8rem;margin-bottom:.5rem">Sin GPS</div>'}
       ${ev.fotos?.length?`<div class="ev-title"><i class="fas fa-camera me-1"></i>Fotos (${ev.fotos.length})</div>
         <div class="ev-photo-grid mb-3">${ev.fotos.map(f=>`<img src="${f}" onclick="verFotoGrande('${f}')">`).join('')}</div>`
-        :'<div class="text-muted" style="font-size:.8rem;margin-bottom:.5rem"><i class="fas fa-camera me-1"></i>Sin fotos</div>'}
-      ${ev.firma?`<div class="ev-title"><i class="fas fa-signature me-1"></i>Firma del cliente</div>
-        <img class="ev-sig-img" src="${ev.firma}">`
-        :'<div class="text-muted" style="font-size:.8rem"><i class="fas fa-signature me-1"></i>Sin firma</div>'}
+        :'<div class="text-muted" style="font-size:.8rem;margin-bottom:.5rem">Sin fotos</div>'}
+      ${ev.firma?`<div class="ev-title"><i class="fas fa-signature me-1"></i>Firma del cliente</div><img class="ev-sig-img" src="${ev.firma}">`
+        :'<div class="text-muted" style="font-size:.8rem">Sin firma</div>'}
     </div>`;
-  document.getElementById('modalTareaDetalleFooter').innerHTML = '<button class="btn-outline-dn" data-bs-dismiss="modal">Cerrar</button>';
+  document.getElementById('modalTareaDetalleFooter').innerHTML='<button class="btn-outline-dn" data-bs-dismiss="modal">Cerrar</button>';
   bootstrap.Modal.getOrCreateInstance(document.getElementById('modalTareaDetalle')).show();
 }
 
 function verFotoGrande(src) {
-  const win = window.open('', '_blank');
-  win.document.write(`<html><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh">
-    <img src="${src}" style="max-width:100%;max-height:100vh;object-fit:contain"></body></html>`);
+  const win=window.open('','_blank');
+  win.document.write(`<html><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="${src}" style="max-width:100%;max-height:100vh;object-fit:contain"></body></html>`);
+}
+
+// ══════════════════════════════════════════════
+//  SEGURIDAD ANTIHACKER
+// ══════════════════════════════════════════════
+const SEC_KEY = 'dn_sec';
+const MAX_FAIL = 5;
+const LOCKOUT  = 10 * 60000;
+const SESSION_T = 8 * 3600000;
+
+function getSec() { try{ return JSON.parse(localStorage.getItem(SEC_KEY))||{}; }catch(e){ return {}; } }
+function saveSec(s) { localStorage.setItem(SEC_KEY, JSON.stringify(s)); }
+
+function checkLoginSecurity() {
+  const s=getSec();
+  if(s.lockUntil&&Date.now()<s.lockUntil){ const m=Math.ceil((s.lockUntil-Date.now())/60000); return `Cuenta bloqueada. Espera ${m} min.`; }
+  return null;
+}
+function registerLoginAttempt(success) {
+  const s=getSec();
+  if(success){ s.failCount=0; s.lockUntil=null; s.sessionStart=Date.now(); }
+  else{ s.failCount=(s.failCount||0)+1; if(s.failCount>=MAX_FAIL){ s.lockUntil=Date.now()+LOCKOUT; s.failCount=0; } }
+  saveSec(s);
+}
+function checkSession() {
+  if(!currentUser) return;
+  const s=getSec();
+  if(s.sessionStart&&Date.now()-s.sessionStart>SESSION_T){ toast('Sesión expirada','warning'); setTimeout(doLogout,1500); }
+}
+let sessionTimer;
+function resetSessionTimer() {
+  clearTimeout(sessionTimer);
+  const s=getSec(); s.sessionStart=Date.now(); saveSec(s);
+  sessionTimer=setTimeout(checkSession, SESSION_T);
+}
+['click','touchstart','keydown'].forEach(ev=>document.addEventListener(ev,resetSessionTimer,{passive:true}));
+
+function sanitize(str) {
+  if(typeof str!=='string') return str;
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
 }
 
 // ══════════════════════════════════════════════
 //  FIREBASE — SINCRONIZACIÓN EN LÍNEA
 // ══════════════════════════════════════════════
+const FB_KEY = 'dukenet_fb_config';
+let fbApp=null, fbDB=null, fbRef=null, fbUnsubscribe=null;
+
 function initFirebase(cfg) {
   try {
-    // Remove existing app if any
-    if (fbApp) { try { fbApp.delete(); } catch(e){} }
-    fbApp = firebase.initializeApp(cfg, 'dukenet-' + Date.now());
-    fbDB  = fbApp.database();
-    fbRef = fbDB.ref('dukenet-bodega');
+    if(fbApp){ try{fbApp.delete();}catch(e){} }
+    fbApp=firebase.initializeApp(cfg,'dukenet-'+Date.now());
+    fbDB=fbApp.database(); fbRef=fbDB.ref('dukenet-bodega');
     setSyncDot('yellow');
-
-    // Real-time listener
-    if (fbUnsubscribe) { fbUnsubscribe(); }
-    fbRef.on('value', snapshot => {
-      const data = snapshot.val();
-      if (data) {
-        DB = data;
-        localStorage.setItem(KEY, JSON.stringify(DB));
-        // Refresh current section
-        const activeEl = document.querySelector('.section-page.active');
-        if (activeEl) {
-          const sec = activeEl.id.replace('sec-','');
-          const renders = {
-            'dashboard': renderDashboard, 'inventario': renderInventario,
-            'tareas': () => renderTareas(filtrTareasActual),
-            'mis-tareas': renderMisTareas, 'bodegas': renderBodegas,
-            'reportes': renderReporte, 'alertas': renderAlertas,
-          };
-          if (renders[sec]) renders[sec]();
+    fbRef.on('value', snap=>{
+      const data=snap.val();
+      if(data){ DB=data; if(!DB.equipos) DB.equipos=[];
+        localStorage.setItem(KEY,JSON.stringify(DB));
+        const ae=document.querySelector('.section-page.active');
+        if(ae){ const sec=ae.id.replace('sec-','');
+          const r={'dashboard':renderDashboard,'inventario':renderInventario,'tareas':()=>renderTareas(filtrTareasActual),
+            'mis-tareas':renderMisTareas,'bodegas':renderInventarioReal,'reportes':renderReporte,'alertas':renderAlertas};
+          if(r[sec]) r[sec]();
         }
       }
       setSyncDot('green');
-    }, err => {
-      console.warn('Firebase read error:', err);
-      setSyncDot('red');
-    });
-
-    // Initial push of local data if Firebase is empty
-    fbRef.once('value').then(snap => {
-      if (!snap.val()) { fbRef.set(DB); }
-    });
-
-    console.log('Firebase conectado');
+    }, ()=>setSyncDot('red'));
+    fbRef.once('value').then(s=>{ if(!s.val()) fbRef.set(DB); });
     return true;
-  } catch(e) {
-    console.error('Firebase error:', e);
-    setSyncDot('red');
-    return false;
-  }
+  } catch(e){ console.error(e); setSyncDot('red'); return false; }
 }
 
 function setSyncDot(color) {
-  const dot = document.getElementById('syncDot');
-  if (!dot) return;
-  dot.style.display = 'inline-block';
-  const colors = { green:'#4caf50', yellow:'#ff9800', red:'#f44336', gray:'#9e9e9e' };
-  dot.style.background = colors[color] || color;
-  dot.title = color==='green' ? 'Sincronizado en línea' : color==='yellow' ? 'Conectando...' : color==='red' ? 'Error de sincronización' : 'Sin conexión';
+  const dot=document.getElementById('syncDot'); if(!dot) return;
+  dot.style.display='inline-block';
+  const c={green:'#4caf50',yellow:'#ff9800',red:'#f44336',gray:'#9e9e9e'};
+  dot.style.background=c[color]||color;
+  dot.title=color==='green'?'Sincronizado en línea':color==='yellow'?'Conectando...':color==='red'?'Error sync':'Sin conexión';
 }
 
 function guardarConfigFirebase() {
-  const raw = document.getElementById('fbConfigInput').value.trim();
-  if (!raw) { toast('Pega el config de Firebase primero','danger'); return; }
-  let cfg;
-  try { cfg = JSON.parse(raw); } catch(e) { toast('JSON inválido, revisa el formato','danger'); return; }
-  if (!cfg.databaseURL) { toast('Falta el campo databaseURL en el config','danger'); return; }
-  localStorage.setItem(FB_KEY, JSON.stringify(cfg));
-  const ok = initFirebase(cfg);
-  if (ok) {
-    toast('Firebase conectado — sincronización activa');
-    renderFirebaseConfig();
-  } else {
-    toast('Error al conectar Firebase, verifica el config','danger');
-  }
+  const raw=document.getElementById('fbConfigInput').value.trim();
+  if(!raw){ toast('Pega el config de Firebase primero','danger'); return; }
+  let cfg; try{ cfg=JSON.parse(raw); }catch(e){ toast('JSON inválido','danger'); return; }
+  if(!cfg.databaseURL){ toast('Falta databaseURL en el config','danger'); return; }
+  localStorage.setItem(FB_KEY,JSON.stringify(cfg));
+  const ok=initFirebase(cfg);
+  if(ok){ toast('Firebase conectado — sincronización activa'); renderFirebaseConfig(); }
+  else{ toast('Error al conectar Firebase','danger'); }
 }
 
 function desconectarFirebase() {
-  if (!confirm('¿Desconectar la sincronización en línea?')) return;
-  if (fbRef) { fbRef.off(); fbRef = null; }
-  if (fbApp) { try { fbApp.delete(); } catch(e){} fbApp = null; fbDB = null; }
+  if(!confirm('¿Desconectar sincronización?')) return;
+  if(fbRef){ fbRef.off(); fbRef=null; }
+  if(fbApp){ try{fbApp.delete();}catch(e){} fbApp=null; fbDB=null; }
   localStorage.removeItem(FB_KEY);
-  setSyncDot('gray');
-  document.getElementById('syncDot').style.display = 'none';
-  renderFirebaseConfig();
-  toast('Sincronización desconectada','warning');
+  const dot=document.getElementById('syncDot'); if(dot) dot.style.display='none';
+  renderFirebaseConfig(); toast('Desconectado','warning');
 }
 
 function renderFirebaseConfig() {
-  const isConnected = !!fbRef;
-  const cfg = localStorage.getItem(FB_KEY);
-  document.getElementById('fbStatus').innerHTML = isConnected
-    ? `<div style="background:#e8f5e9;border-radius:8px;padding:.75rem 1rem;font-size:.85rem">
-        <i class="fas fa-circle text-success me-2"></i><b>Conectado en línea</b> — Los datos se sincronizan en tiempo real entre todos los dispositivos.
-       </div>`
-    : `<div style="background:#fff3e0;border-radius:8px;padding:.75rem 1rem;font-size:.85rem">
-        <i class="fas fa-circle text-warning me-2"></i><b>Sin conexión en línea</b> — La app usa almacenamiento local. Solo este dispositivo ve los datos.
-       </div>`;
-  if (cfg) {
-    try {
-      document.getElementById('fbConfigInput').value = JSON.stringify(JSON.parse(cfg), null, 2);
-    } catch(e) {}
-  }
+  const isConn=!!fbRef;
+  const cfg=localStorage.getItem(FB_KEY);
+  document.getElementById('fbStatus').innerHTML=isConn
+    ?`<div style="background:#e8f5e9;border-radius:8px;padding:.75rem 1rem;font-size:.85rem"><i class="fas fa-circle text-success me-2"></i><b>Conectado en línea</b> — Sincronización en tiempo real activa.</div>`
+    :`<div style="background:#fff3e0;border-radius:8px;padding:.75rem 1rem;font-size:.85rem"><i class="fas fa-circle text-warning me-2"></i><b>Sin conexión en línea</b> — Solo almacenamiento local.</div>`;
+  if(cfg){ try{ document.getElementById('fbConfigInput').value=JSON.stringify(JSON.parse(cfg),null,2); }catch(e){} }
 }
 
 // ══════════════════════════════════════════════
-//  BODEGAS POR TÉCNICO
+//  INVENTARIO REAL — BODEGA PRINCIPAL + TÉCNICOS
 // ══════════════════════════════════════════════
-function renderBodegas() {
-  const tecnicos = DB.usuarios.filter(u => u.rol === 'tecnico');
-  const grid = document.getElementById('bodegasGrid');
-  if (!tecnicos.length) {
-    grid.innerHTML = '<div class="empty-state"><i class="fas fa-warehouse"></i>No hay técnicos registrados</div>';
-    return;
-  }
-  grid.innerHTML = tecnicos.map(tec => {
-    const asigs = DB.asignaciones.filter(a => a.tecId === tec.id && a.pendiente > 0);
-    const totalItems = asigs.length;
-    const totalVal = asigs.reduce((s, a) => {
-      const m = getMaterial(a.matId);
-      return s + (a.pendiente * (m?.costo || 0));
-    }, 0);
-    const tareasActivas = DB.tareas.filter(t => t.tecId === tec.id && !['completada','cancelada'].includes(t.estado)).length;
+let bodegaTabActual = 'principal';
 
+function renderInventarioReal() {
+  if(!DB.equipos) DB.equipos=[];
+  renderBodegasKpis();
+  switchBodegaTab(bodegaTabActual);
+}
+
+function switchBodegaTab(tab, btn) {
+  bodegaTabActual=tab;
+  ['principal','tecnicos','equipos'].forEach(t=>{
+    const el=document.getElementById('bodegaTab'+t.charAt(0).toUpperCase()+t.slice(1));
+    if(el) el.style.display=t===tab?'':'none';
+  });
+  document.querySelectorAll('#sec-bodegas .btn-outline-dn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  if(tab==='principal') renderBodegaPrincipal();
+  if(tab==='tecnicos')  renderBodegas();
+  if(tab==='equipos')   { populateEquiposFiltros(); renderEquipos(); }
+}
+
+function renderBodegasKpis() {
+  const totalStock=DB.materiales.reduce((s,m)=>s+m.stock*(m.costo||0),0);
+  const conTecs=DB.asignaciones.filter(a=>a.pendiente>0).reduce((s,a)=>{const m=getMaterial(a.matId);return s+a.pendiente*(m?.costo||0);},0);
+  const totalEq=(DB.equipos||[]).length;
+  const eqBodega=(DB.equipos||[]).filter(e=>e.estado==='bodega').length;
+  document.getElementById('bodegasKpis').innerHTML=`
+    <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-icon blue"><i class="fas fa-warehouse"></i></div><div>
+      <div class="stat-val">$${totalStock.toLocaleString('es-CO',{maximumFractionDigits:0})}</div><div class="stat-lbl">Valor Bodega Central</div></div></div></div>
+    <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-icon warn"><i class="fas fa-hard-hat"></i></div><div>
+      <div class="stat-val">$${conTecs.toLocaleString('es-CO',{maximumFractionDigits:0})}</div><div class="stat-lbl">Con Técnicos</div></div></div></div>
+    <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-icon cyan"><i class="fas fa-barcode"></i></div><div>
+      <div class="stat-val">${eqBodega}/${totalEq}</div><div class="stat-lbl">Equipos en Bodega/Total</div></div></div></div>
+    <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-icon green"><i class="fas fa-coins"></i></div><div>
+      <div class="stat-val">$${(totalStock+conTecs).toLocaleString('es-CO',{maximumFractionDigits:0})}</div><div class="stat-lbl">Inventario Total</div></div></div></div>`;
+}
+
+function renderBodegaPrincipal() {
+  const rows=DB.materiales.map(m=>{
+    const conTecs=DB.asignaciones.filter(a=>a.matId===m.id&&a.pendiente>0).reduce((s,a)=>s+a.pendiente,0);
+    const total=m.stock+conTecs;
+    const badge=m.stock<=m.min?'badge-danger':m.stock<=m.min*1.5?'badge-warn':'badge-ok';
+    return `<tr>
+      <td><code style="font-size:.78rem">${m.cod}</code></td>
+      <td><div style="font-weight:600;font-size:.85rem">${m.nombre}</div></td>
+      <td><span class="chip-category ${m.cat}">${CATEGORIAS[m.cat]||m.cat}</span></td>
+      <td><span class="badge-dn ${badge}">${m.stock} ${m.unidad}</span></td>
+      <td style="color:var(--dn-warning);font-weight:600">${conTecs} ${m.unidad}</td>
+      <td><b>${total} ${m.unidad}</b></td>
+      <td style="font-size:.8rem">${m.min}</td>
+      <td><span class="badge-dn ${badge}" style="font-size:.7rem">${m.stock<=m.min?'CRÍTICO':m.stock<=m.min*1.5?'BAJO':'OK'}</span></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('bodegaPrincipalBody').innerHTML=rows||'<tr><td colspan="8"><div class="empty-state">Sin materiales</div></td></tr>';
+}
+
+// ══════════════════════════════════════════════
+//  EQUIPOS SERIALIZADOS (ONUs, Repetidores, etc.)
+// ══════════════════════════════════════════════
+let qrScanner=null;
+const EQ_ESTADOS={bodega:'En Bodega',asignado:'Con Técnico',instalado:'Instalado',dañado:'Dañado/Baja'};
+const EQ_BADGE={bodega:'badge-ok',asignado:'badge-warn',instalado:'badge-cyan',dañado:'badge-danger'};
+const TIPOS_SERIAL=['equipos'];
+
+function populateEquiposFiltros() {
+  const mats=DB.materiales.filter(m=>TIPOS_SERIAL.includes(m.cat));
+  document.getElementById('filtEqMat').innerHTML='<option value="">Todos los tipos</option>'+mats.map(m=>`<option value="${m.id}">${m.nombre}</option>`).join('');
+}
+
+function renderEquipos() {
+  if(!DB.equipos) DB.equipos=[];
+  const filtMat=document.getElementById('filtEqMat')?.value||'';
+  const filtEst=document.getElementById('filtEqEstado')?.value||'';
+  const lista=DB.equipos.filter(e=>(!filtMat||e.matId===filtMat)&&(!filtEst||e.estado===filtEst));
+  document.getElementById('equiposBody').innerHTML=lista.length?lista.map(e=>{
+    const m=getMaterial(e.matId), tec=e.tecId?getTecnico(e.tecId):null;
+    const ubi=e.estado==='bodega'?'<span class="badge-dn badge-ok">Bodega</span>'
+      :e.estado==='instalado'?`<span class="badge-dn badge-cyan">${sanitize(e.cliente||'Cliente')}</span>`
+      :tec?`<span class="badge-dn badge-warn">${sanitize(tec.nombre)}</span>`:'—';
+    return `<tr>
+      <td><div style="font-weight:600;font-size:.83rem">${m?.nombre||'—'}</div></td>
+      <td><code style="font-size:.8rem">${sanitize(e.serial)}</code></td>
+      <td><code style="font-size:.75rem;color:var(--dn-muted)">${sanitize(e.mac||'—')}</code></td>
+      <td><span class="badge-dn ${EQ_BADGE[e.estado]||'badge-gray'}" style="font-size:.7rem">${EQ_ESTADOS[e.estado]||e.estado}</span></td>
+      <td>${ubi}</td><td style="font-size:.78rem">${e.fechaIngreso||'—'}</td>
+      <td style="font-size:.78rem">${sanitize(e.obs||'—')}</td>
+      <td>
+        ${e.estado==='bodega'?`<button class="btn-sm-icon text-primary" onclick="abrirAsignarEquipo('${e.id}')"><i class="fas fa-hand-holding-box"></i></button>`:''}
+        ${e.estado==='asignado'?`<button class="btn-sm-icon text-success" onclick="marcarEquipoInstalado('${e.id}')"><i class="fas fa-check-circle"></i></button>`:''}
+        <button class="btn-sm-icon text-danger" onclick="marcarEquipoDanado('${e.id}')"><i class="fas fa-times-circle"></i></button>
+      </td></tr>`;
+  }).join(''):'<tr><td colspan="8"><div class="empty-state"><i class="fas fa-barcode"></i>Sin equipos registrados</div></td></tr>';
+}
+
+function abrirScannerEquipo() {
+  const mats=DB.materiales.filter(m=>TIPOS_SERIAL.includes(m.cat));
+  document.getElementById('eqMat').innerHTML='<option value="">Selecciona tipo...</option>'+mats.map(m=>`<option value="${m.id}">${m.nombre}</option>`).join('');
+  ['eqSerial','eqMac','eqObs'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEquipo')).show();
+}
+
+function iniciarScanner() {
+  if(qrScanner){ try{qrScanner.stop();}catch(e){} }
+  qrScanner=new Html5Qrcode('scannerContainer');
+  qrScanner.start({facingMode:'environment'},{fps:10,qrbox:{width:250,height:120}},
+    text=>{ document.getElementById('eqSerial').value=text.trim(); detenerScanner(); toast('Escaneado: '+text.slice(0,30)); },
+    ()=>{}
+  ).catch(()=>toast('No se pudo acceder a la cámara','danger'));
+}
+
+function detenerScanner() {
+  if(qrScanner){ qrScanner.stop().catch(()=>{}).finally(()=>{ qrScanner=null; const c=document.getElementById('scannerContainer'); if(c) c.innerHTML=''; }); }
+}
+
+function guardarEquipo() {
+  const matId=document.getElementById('eqMat').value;
+  const serial=document.getElementById('eqSerial').value.trim();
+  if(!matId){ toast('Selecciona el tipo de equipo','danger'); return; }
+  if(!serial){ toast('El serial es obligatorio','danger'); return; }
+  if(!DB.equipos) DB.equipos=[];
+  if(DB.equipos.find(e=>e.serial===serial)){ toast('Ya existe un equipo con ese serial','danger'); return; }
+  const mac=document.getElementById('eqMac').value.trim();
+  const obs=document.getElementById('eqObs').value.trim();
+  DB.equipos.push({id:uid(),matId,serial,mac,obs,estado:'bodega',tecId:null,tareaId:null,cliente:'',fechaIngreso:new Date().toISOString().slice(0,10)});
+  const m=getMaterial(matId);
+  addActividad('equipo',`Ingreso: ${m?.nombre||''} serial ${serial}`,'barcode','blue');
+  saveDB(); detenerScanner();
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEquipo')).hide();
+  renderEquipos(); toast('Equipo registrado en bodega');
+}
+
+function abrirAsignarEquipo(id) {
+  const eq=(DB.equipos||[]).find(e=>e.id===id); if(!eq) return;
+  const m=getMaterial(eq.matId);
+  document.getElementById('asigEqId').value=id;
+  document.getElementById('asigEqInfo').innerHTML=`<b>${m?.nombre||'Equipo'}</b><br>Serial: <code>${sanitize(eq.serial)}</code>${eq.mac?'<br>MAC: <code>'+sanitize(eq.mac)+'</code>':''}`;
+  const tecs=getTecnicos();
+  document.getElementById('asigEqTec').innerHTML='<option value="">Selecciona técnico...</option>'+tecs.map(t=>`<option value="${t.id}">${t.nombre} — ${t.zona||'Sin zona'}</option>`).join('');
+  const tareas=DB.tareas.filter(t=>!['completada','cancelada'].includes(t.estado));
+  document.getElementById('asigEqTarea').innerHTML='<option value="">Sin tarea</option>'+tareas.map(t=>`<option value="${t.id}">${t.titulo}</option>`).join('');
+  document.getElementById('asigEqCliente').value='';
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('modalAsignarEquipo')).show();
+}
+
+function confirmarAsignarEquipo() {
+  const id=document.getElementById('asigEqId').value;
+  const tecId=document.getElementById('asigEqTec').value;
+  if(!tecId){ toast('Selecciona un técnico','danger'); return; }
+  const eq=(DB.equipos||[]).find(e=>e.id===id); if(!eq) return;
+  eq.estado='asignado'; eq.tecId=tecId;
+  eq.tareaId=document.getElementById('asigEqTarea').value||null;
+  eq.cliente=document.getElementById('asigEqCliente').value.trim();
+  const tec=getTecnico(tecId), m=getMaterial(eq.matId);
+  addActividad('equipo',`${m?.nombre||'Equipo'} serial ${eq.serial} → ${tec?.nombre}`,'hand-holding-box','cyan');
+  saveDB();
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('modalAsignarEquipo')).hide();
+  renderEquipos(); toast(`Equipo asignado a ${tec?.nombre}`);
+}
+
+function marcarEquipoInstalado(id) {
+  const eq=(DB.equipos||[]).find(e=>e.id===id); if(!eq) return;
+  const cliente=prompt('Cliente donde se instaló:')||'';
+  eq.estado='instalado'; eq.cliente=cliente;
+  const m=getMaterial(eq.matId);
+  addActividad('equipo',`${m?.nombre||'Equipo'} serial ${eq.serial} instalado en ${cliente||'cliente'}`,'check-circle','green');
+  saveDB(); renderEquipos(); toast('Equipo marcado como instalado');
+}
+
+function marcarEquipoDanado(id) {
+  const eq=(DB.equipos||[]).find(e=>e.id===id);
+  if(!eq||!confirm('¿Marcar como dañado/baja?')) return;
+  eq.estado='dañado'; eq.tecId=null;
+  const m=getMaterial(eq.matId);
+  addActividad('equipo',`${m?.nombre||'Equipo'} serial ${eq.serial} dado de baja`,'times-circle','red');
+  saveDB(); renderEquipos(); toast('Equipo dado de baja','warning');
+}
+
+function renderBodegas() {
+  if(!DB.equipos) DB.equipos=[];
+  const tecnicos=DB.usuarios.filter(u=>u.rol==='tecnico');
+  const grid=document.getElementById('bodegasGrid');
+  if(!tecnicos.length){ grid.innerHTML='<div class="empty-state"><i class="fas fa-warehouse"></i>No hay técnicos</div>'; return; }
+  grid.innerHTML=tecnicos.map(tec=>{
+    const asigs=DB.asignaciones.filter(a=>a.tecId===tec.id&&a.pendiente>0);
+    const eqsTec=(DB.equipos||[]).filter(e=>e.tecId===tec.id&&e.estado==='asignado');
+    const totalVal=asigs.reduce((s,a)=>{const m=getMaterial(a.matId);return s+a.pendiente*(m?.costo||0);},0)
+                  +eqsTec.reduce((s,e)=>{const m=getMaterial(e.matId);return s+(m?.costo||0);},0);
+    const activas=DB.tareas.filter(t=>t.tecId===tec.id&&!['completada','cancelada'].includes(t.estado)).length;
     return `<div class="panel mb-3">
       <div class="panel-header">
         <div class="d-flex align-items-center gap-2">
           <div class="u-avatar" style="background:var(--dn-blue)">${tec.avatar||tec.nombre[0]}</div>
-          <div>
-            <div style="font-weight:700">${tec.nombre}</div>
-            <div style="font-size:.75rem;color:var(--dn-muted)">${tec.zona||'Sin zona'} ${tec.tel?'· '+tec.tel:''}</div>
-          </div>
+          <div><div style="font-weight:700">${sanitize(tec.nombre)}</div><div style="font-size:.75rem;color:var(--dn-muted)">${sanitize(tec.zona||'Sin zona')}</div></div>
         </div>
-        <div class="d-flex gap-2 align-items-center">
-          <span class="badge-dn ${tareasActivas>0?'badge-cyan':'badge-gray'}" style="font-size:.72rem"><i class="fas fa-tasks me-1"></i>${tareasActivas} tarea(s)</span>
-          <span class="badge-dn ${totalItems>0?'badge-warn':'badge-ok'}" style="font-size:.72rem"><i class="fas fa-boxes-stacked me-1"></i>${totalItems} ítem(s)</span>
+        <div class="d-flex gap-2 flex-wrap">
+          <span class="badge-dn ${activas>0?'badge-cyan':'badge-gray'}" style="font-size:.7rem">${activas} tarea(s)</span>
+          <span class="badge-dn badge-warn" style="font-size:.7rem">$${totalVal.toFixed(2)} custodia</span>
         </div>
       </div>
-      ${asigs.length ? `
-      <div class="table-wrapper">
-        <table class="table-dn">
-          <thead><tr><th>Material</th><th>Asignado</th><th>Pendiente</th><th>Tarea</th><th>Costo est.</th></tr></thead>
-          <tbody>
-            ${asigs.map(a => {
-              const m = getMaterial(a.matId);
-              const tar = getTarea(a.tareaId);
-              return `<tr>
-                <td><div style="font-weight:600;font-size:.85rem">${m?.nombre||'—'}</div><code style="font-size:.72rem">${m?.cod||''}</code></td>
-                <td>${a.cantidad} ${m?.unidad||''}</td>
-                <td><span class="badge-dn badge-warn">${a.pendiente} ${m?.unidad||''}</span></td>
-                <td style="font-size:.78rem">${tar?.titulo||'—'}</td>
-                <td style="font-size:.8rem">$${((a.pendiente*(m?.costo||0)).toFixed(2))}</td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-          <tfoot>
-            <tr><td colspan="4" style="padding:.6rem .85rem;font-size:.8rem;font-weight:700">VALOR TOTAL EN CUSTODIA</td>
-            <td style="padding:.6rem .85rem;font-weight:700;color:var(--dn-blue)">$${totalVal.toFixed(2)}</td></tr>
-          </tfoot>
-        </table>
-      </div>` : `<div class="panel-body text-muted" style="font-size:.85rem"><i class="fas fa-check-circle text-success me-1"></i>Sin material pendiente en custodia</div>`}
-    </div>`;
-  }).join('');
-}
-
-// ══════════════════════════════════════════════
-//  DESCARGO DE MATERIAL AL EJECUTAR ORDEN
-// ══════════════════════════════════════════════
-function cargarMaterialEjecutar(tareaId) {
-  const asigs = DB.asignaciones.filter(a => a.tareaId === tareaId && a.pendiente > 0);
-  const lista = document.getElementById('ejMaterialLista');
-  if (!asigs.length) {
-    lista.innerHTML = '<div style="padding:.75rem 1rem;font-size:.83rem;color:var(--dn-muted)"><i class="fas fa-box-open me-1"></i>Sin material asignado a esta tarea</div>';
-    return;
-  }
-  lista.innerHTML = asigs.map((a, i) => {
-    const m = getMaterial(a.matId);
-    return `<div style="padding:.65rem 1rem;border-bottom:1px solid var(--dn-border);display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
-      <div style="flex:1;min-width:150px">
-        <div style="font-weight:600;font-size:.85rem">${m?.nombre||'—'}</div>
-        <div style="font-size:.75rem;color:var(--dn-muted)">Pendiente: <b>${a.pendiente} ${m?.unidad||''}</b></div>
-      </div>
-      <div style="display:flex;align-items:center;gap:.5rem">
-        <label style="font-size:.8rem;white-space:nowrap">Cantidad usada:</label>
-        <input type="number" class="form-control" id="ejMat_${a.id}"
-          min="0" max="${a.pendiente}" value="${a.pendiente}"
-          style="width:90px;font-size:.85rem;padding:.25rem .5rem" inputmode="numeric">
-        <span style="font-size:.78rem;color:var(--dn-muted)">${m?.unidad||''}</span>
-      </div>
-      <div>
-        <select class="form-select" id="ejMatTipo_${a.id}" style="font-size:.78rem;padding:.25rem .5rem;width:120px">
-          <option value="uso">Uso en obra</option>
-          <option value="devolucion">Devolución</option>
-          <option value="perdida">Pérdida/Daño</option>
-        </select>
-      </div>
+      ${asigs.length||eqsTec.length?`<div class="table-wrapper"><table class="table-dn">
+        <thead><tr><th>Material / Equipo</th><th>Serial / Cant.</th><th>Costo est.</th></tr></thead><tbody>
+        ${asigs.map(a=>{const m=getMaterial(a.matId);return`<tr><td>${m?.nombre||'—'}</td><td>${a.pendiente} ${m?.unidad||''}</td><td>$${(a.pendiente*(m?.costo||0)).toFixed(2)}</td></tr>`;}).join('')}
+        ${eqsTec.map(e=>{const m=getMaterial(e.matId);return`<tr><td><i class="fas fa-barcode me-1 text-primary"></i>${m?.nombre||'—'}</td><td><code style="font-size:.75rem">${sanitize(e.serial)}</code></td><td>$${(m?.costo||0).toFixed(2)}</td></tr>`;}).join('')}
+        </tbody><tfoot><tr><td colspan="2" style="padding:.5rem .85rem;font-size:.8rem">TOTAL CUSTODIA</td><td style="padding:.5rem .85rem;font-weight:700;color:var(--dn-blue)">$${totalVal.toFixed(2)}</td></tr></tfoot>
+      </table></div>`:`<div class="panel-body text-muted" style="font-size:.85rem"><i class="fas fa-check-circle text-success me-1"></i>Sin material</div>`}
     </div>`;
   }).join('');
 }
