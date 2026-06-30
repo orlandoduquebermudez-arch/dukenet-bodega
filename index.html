@@ -18,7 +18,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<!-- html5-qrcode removido: se usa lector físico de barras -->
 <style>
   :root {
     --dn-blue: #0d47a1;
@@ -773,42 +773,52 @@
 
       <!-- MODAL EQUIPO (agregar/escanear) -->
       <div class="modal fade" id="modalEquipo" tabindex="-1">
-        <div class="modal-dialog modal-fullscreen-sm-down">
+        <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
           <div class="modal-content">
             <div class="modal-header" style="background:linear-gradient(135deg,var(--dn-blue),#1565c0);color:#fff">
-              <h5 class="modal-title text-white"><i class="fas fa-barcode me-2"></i>Registrar Equipo</h5>
+              <h5 class="modal-title text-white"><i class="fas fa-barcode me-2"></i>Registrar Equipo — Lector de Barras</h5>
               <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-              <!-- Scanner -->
+              <!-- Tipo de equipo -->
               <div class="mb-3">
-                <label class="form-label"><i class="fas fa-camera me-1"></i>Escanear código de barras / QR</label>
-                <div id="scannerContainer" style="border-radius:10px;overflow:hidden;background:#000;max-height:250px"></div>
-                <div class="d-flex gap-2 mt-2">
-                  <button class="btn-primary-dn" style="font-size:.82rem" onclick="iniciarScanner()"><i class="fas fa-qrcode me-1"></i>Abrir cámara</button>
-                  <button class="btn-outline-dn" style="font-size:.82rem" onclick="detenerScanner()"><i class="fas fa-stop me-1"></i>Detener</button>
-                </div>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Tipo de equipo</label>
+                <label class="form-label fw-semibold">Tipo de equipo</label>
                 <select id="eqMat" class="form-select"><option value="">Selecciona tipo...</option></select>
               </div>
+              <!-- Campo de escaneo -->
               <div class="mb-3">
-                <label class="form-label">Número de serie <span class="text-danger">*</span></label>
-                <input id="eqSerial" type="text" class="form-control" placeholder="Ej: HWTC1234567890" style="font-family:monospace">
+                <label class="form-label fw-semibold"><i class="fas fa-barcode me-1 text-primary"></i>Escanear serial <span class="text-danger">*</span></label>
+                <div class="input-group">
+                  <span class="input-group-text" style="background:#e8f0fe"><i class="fas fa-keyboard text-primary"></i></span>
+                  <input id="eqScanInput" type="text" class="form-control" placeholder="Apunte el lector aquí y escanee..." autocomplete="off" style="font-family:monospace;font-size:1.1rem;letter-spacing:.05em">
+                  <button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('eqScanInput').value='';document.getElementById('eqScanInput').focus()" title="Limpiar"><i class="fas fa-times"></i></button>
+                </div>
+                <div id="scanStatus" class="mt-1" style="font-size:.82rem;color:#666;min-height:20px"></div>
               </div>
+              <!-- MAC opcional -->
               <div class="mb-3">
                 <label class="form-label">Dirección MAC (opcional)</label>
                 <input id="eqMac" type="text" class="form-control" placeholder="Ej: 48:AD:08:11:22:33" style="font-family:monospace">
               </div>
+              <!-- Observaciones -->
               <div class="mb-3">
                 <label class="form-label">Observaciones</label>
                 <input id="eqObs" type="text" class="form-control" placeholder="Notas adicionales">
               </div>
+              <!-- Lista de seriales escaneados -->
+              <div class="mb-2">
+                <label class="form-label fw-semibold">Seriales en cola <span id="scanCount" class="badge bg-primary ms-1">0</span></label>
+                <div id="scanList" style="max-height:180px;overflow-y:auto;border:1px solid #dee2e6;border-radius:8px;padding:8px;background:#f8f9fa;min-height:48px">
+                  <span class="text-muted" style="font-size:.85rem" id="scanListEmpty">No hay seriales escaneados aún.</span>
+                </div>
+              </div>
             </div>
-            <div class="modal-footer">
-              <button class="btn-outline-dn" data-bs-dismiss="modal">Cancelar</button>
-              <button class="btn-primary-dn" onclick="guardarEquipo()"><i class="fas fa-save me-1"></i>Registrar</button>
+            <div class="modal-footer d-flex justify-content-between align-items-center">
+              <button class="btn btn-sm btn-outline-danger" onclick="limpiarEscaneos()" id="btnLimpiarScans" style="display:none!important"><i class="fas fa-trash me-1"></i>Limpiar lista</button>
+              <div>
+                <button class="btn-outline-dn me-2" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn-primary-dn" onclick="guardarEquipo()"><i class="fas fa-save me-1"></i>Registrar todos</button>
+              </div>
             </div>
           </div>
         </div>
@@ -2444,41 +2454,143 @@ function renderEquipos() {
   }).join(''):'<tr><td colspan="8"><div class="empty-state"><i class="fas fa-barcode"></i>Sin equipos registrados</div></td></tr>';
 }
 
+// ── LECTOR FÍSICO DE BARRAS ──────────────────────────────────────────────────
+let _scanQueue = [];      // seriales escaneados pendientes de guardar
+let _scanBuf = '';        // buffer de teclas del lector
+let _scanTimer = null;    // timer para detectar fin de escaneo
+
 function abrirScannerEquipo() {
-  const mats=DB.materiales.filter(m=>TIPOS_SERIAL.includes(m.cat));
-  document.getElementById('eqMat').innerHTML='<option value="">Selecciona tipo...</option>'+mats.map(m=>`<option value="${m.id}">${m.nombre}</option>`).join('');
-  ['eqSerial','eqMac','eqObs'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  const mats = DB.materiales.filter(m => TIPOS_SERIAL.includes(m.cat));
+  document.getElementById('eqMat').innerHTML =
+    '<option value="">Selecciona tipo...</option>' +
+    mats.map(m => `<option value="${m.id}">${m.nombre}</option>`).join('');
+  ['eqMac','eqObs'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  _scanQueue = [];
+  _renderScanList();
   bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEquipo')).show();
+  // auto-foco tras animación del modal
+  setTimeout(() => {
+    const inp = document.getElementById('eqScanInput');
+    if(inp){ inp.value=''; inp.focus(); }
+  }, 350);
 }
 
-function iniciarScanner() {
-  if(qrScanner){ try{qrScanner.stop();}catch(e){} }
-  qrScanner=new Html5Qrcode('scannerContainer');
-  qrScanner.start({facingMode:'environment'},{fps:10,qrbox:{width:250,height:120}},
-    text=>{ document.getElementById('eqSerial').value=text.trim(); detenerScanner(); toast('Escaneado: '+text.slice(0,30)); },
-    ()=>{}
-  ).catch(()=>toast('No se pudo acceder a la cámara','danger'));
+// Listener de teclas en el campo de escaneo — detecta lector físico (≤80 ms/char)
+function _onScanKey(e) {
+  if(e.key === 'Enter') {
+    e.preventDefault();
+    const val = _scanBuf.trim() || document.getElementById('eqScanInput').value.trim();
+    _scanBuf = '';
+    clearTimeout(_scanTimer);
+    if(val) _agregarSerial(val);
+    document.getElementById('eqScanInput').value = '';
+    return;
+  }
+  // Los lectores físicos escriben muy rápido; acumulamos en buffer con timer
+  _scanBuf += e.key.length === 1 ? e.key : '';
+  clearTimeout(_scanTimer);
+  _scanTimer = setTimeout(() => {
+    // Si pasaron 200ms sin Enter, el usuario está escribiendo manual → no hacer nada
+    _scanBuf = '';
+  }, 200);
 }
 
-function detenerScanner() {
-  if(qrScanner){ qrScanner.stop().catch(()=>{}).finally(()=>{ qrScanner=null; const c=document.getElementById('scannerContainer'); if(c) c.innerHTML=''; }); }
+function _agregarSerial(serial) {
+  serial = serial.toUpperCase().replace(/\s/g,'');
+  if(_scanQueue.includes(serial)){
+    _flashStatus('⚠️ Serial duplicado en cola: '+serial, 'warning');
+    return;
+  }
+  if((DB.equipos||[]).find(e=>e.serial===serial)){
+    _flashStatus('⚠️ Ya existe en base de datos: '+serial, 'danger');
+    return;
+  }
+  _scanQueue.push(serial);
+  _renderScanList();
+  _flashStatus('✔ Agregado: '+serial, 'success');
 }
+
+function _renderScanList() {
+  const list = document.getElementById('scanList');
+  const empty = document.getElementById('scanListEmpty');
+  const count = document.getElementById('scanCount');
+  const btnLimpiar = document.getElementById('btnLimpiarScans');
+  if(!list) return;
+  count.textContent = _scanQueue.length;
+  if(_scanQueue.length === 0) {
+    list.innerHTML = '<span class="text-muted" style="font-size:.85rem" id="scanListEmpty">No hay seriales escaneados aún.</span>';
+    if(btnLimpiar) btnLimpiar.style.display='none';
+    return;
+  }
+  if(btnLimpiar) btnLimpiar.style.removeProperty('display');
+  list.innerHTML = _scanQueue.map((s,i) =>
+    `<div class="d-flex justify-content-between align-items-center py-1 px-2 mb-1" style="background:#fff;border-radius:6px;border:1px solid #dee2e6">
+      <code style="font-size:.9rem">${sanitize(s)}</code>
+      <button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="_quitarSerial(${i})" title="Quitar"><i class="fas fa-times"></i></button>
+    </div>`
+  ).join('');
+}
+
+function _quitarSerial(idx) {
+  _scanQueue.splice(idx, 1);
+  _renderScanList();
+}
+
+function limpiarEscaneos() {
+  _scanQueue = [];
+  _renderScanList();
+}
+
+function _flashStatus(msg, type) {
+  const el = document.getElementById('scanStatus');
+  if(!el) return;
+  const colors = {success:'#198754', warning:'#f59e0b', danger:'#dc3545'};
+  el.style.color = colors[type]||'#666';
+  el.textContent = msg;
+  setTimeout(()=>{ if(el.textContent===msg) el.textContent=''; }, 2500);
+}
+
+// Activar/desactivar listener al mostrar/ocultar el modal
+document.addEventListener('DOMContentLoaded', () => {
+  const modalEl = document.getElementById('modalEquipo');
+  if(!modalEl) return;
+  const scanInp = document.getElementById('eqScanInput');
+  if(scanInp){
+    scanInp.addEventListener('keydown', _onScanKey);
+  }
+  modalEl.addEventListener('hidden.bs.modal', () => {
+    _scanQueue = []; _scanBuf = ''; clearTimeout(_scanTimer);
+    _renderScanList();
+  });
+});
+
+// (Ya no se necesitan iniciarScanner / detenerScanner — se dejan vacías por compatibilidad)
+function iniciarScanner() {}
+function detenerScanner() {}
 
 function guardarEquipo() {
-  const matId=document.getElementById('eqMat').value;
-  const serial=document.getElementById('eqSerial').value.trim();
+  const matId = document.getElementById('eqMat').value;
   if(!matId){ toast('Selecciona el tipo de equipo','danger'); return; }
-  if(!serial){ toast('El serial es obligatorio','danger'); return; }
+  // Si hay texto en el input que no fue agregado, lo agregamos ahora
+  const inp = document.getElementById('eqScanInput');
+  if(inp && inp.value.trim()) _agregarSerial(inp.value.trim());
+  if(_scanQueue.length === 0){ toast('Escanea al menos un serial','danger'); return; }
   if(!DB.equipos) DB.equipos=[];
-  if(DB.equipos.find(e=>e.serial===serial)){ toast('Ya existe un equipo con ese serial','danger'); return; }
-  const mac=document.getElementById('eqMac').value.trim();
-  const obs=document.getElementById('eqObs').value.trim();
-  DB.equipos.push({id:uid(),matId,serial,mac,obs,estado:'bodega',tecId:null,tareaId:null,cliente:'',fechaIngreso:new Date().toISOString().slice(0,10)});
-  const m=getMaterial(matId);
-  addActividad('equipo',`Ingreso: ${m?.nombre||''} serial ${serial}`,'barcode','blue');
-  saveDB(); detenerScanner();
+  const mac = document.getElementById('eqMac').value.trim();
+  const obs = document.getElementById('eqObs').value.trim();
+  const fecha = new Date().toISOString().slice(0,10);
+  const m = getMaterial(matId);
+  let count = 0;
+  _scanQueue.forEach(serial => {
+    if(DB.equipos.find(e=>e.serial===serial)) return; // skip duplicates
+    DB.equipos.push({id:uid(),matId,serial,mac,obs,estado:'bodega',tecId:null,tareaId:null,cliente:'',fechaIngreso:fecha});
+    addActividad('equipo',`Ingreso: ${m?.nombre||''} serial ${serial}`,'barcode','blue');
+    count++;
+  });
+  saveDB();
   bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEquipo')).hide();
-  renderEquipos(); toast('Equipo registrado en bodega');
+  renderEquipos();
+  toast(`${count} equipo(s) registrado(s) en bodega`);
 }
 
 function abrirAsignarEquipo(id) {
@@ -2524,43 +2636,24 @@ function marcarEquipoDanado(id) {
   eq.estado='dañado'; eq.tecId=null;
   const m=getMaterial(eq.matId);
   addActividad('equipo',`${m?.nombre||'Equipo'} serial ${eq.serial} dado de baja`,'times-circle','red');
-  saveDB(); renderEquipos(); toast('Equipo dado de baja','warning');
-}
-
-function renderBodegas() {
-  if(!DB.equipos) DB.equipos=[];
-  const tecnicos=DB.usuarios.filter(u=>u.rol==='tecnico');
-  const grid=document.getElementById('bodegasGrid');
-  if(!tecnicos.length){ grid.innerHTML='<div class="empty-state"><i class="fas fa-warehouse"></i>No hay técnicos</div>'; return; }
-  grid.innerHTML=tecnicos.map(tec=>{
-    const asigs=DB.asignaciones.filter(a=>a.tecId===tec.id&&a.pendiente>0);
-    const eqsTec=(DB.equipos||[]).filter(e=>e.tecId===tec.id&&e.estado==='asignado');
-    const totalVal=asigs.reduce((s,a)=>{const m=getMaterial(a.matId);return s+a.pendiente*(m?.costo||0);},0)
-                  +eqsTec.reduce((s,e)=>{const m=getMaterial(e.matId);return s+(m?.costo||0);},0);
-    const activas=DB.tareas.filter(t=>t.tecId===tec.id&&!['completada','cancelada'].includes(t.estado)).length;
-    return `<div class="panel mb-3">
-      <div class="panel-header">
-        <div class="d-flex align-items-center gap-2">
-          <div class="u-avatar" style="background:var(--dn-blue)">${tec.avatar||tec.nombre[0]}</div>
-          <div><div style="font-weight:700">${sanitize(tec.nombre)}</div><div style="font-size:.75rem;color:var(--dn-muted)">${sanitize(tec.zona||'Sin zona')}</div></div>
-        </div>
-        <div class="d-flex gap-2 flex-wrap">
-          <span class="badge-dn ${activas>0?'badge-cyan':'badge-gray'}" style="font-size:.7rem">${activas} tarea(s)</span>
-          <span class="badge-dn badge-warn" style="font-size:.7rem">$${totalVal.toFixed(2)} custodia</span>
-        </div>
-      </div>
-      ${asigs.length||eqsTec.length?`<div class="table-wrapper"><table class="table-dn">
-        <thead><tr><th>Material / Equipo</th><th>Serial / Cant.</th><th>Costo est.</th></tr></thead><tbody>
-        ${asigs.map(a=>{const m=getMaterial(a.matId);return`<tr><td>${m?.nombre||'—'}</td><td>${a.pendiente} ${m?.unidad||''}</td><td>$${(a.pendiente*(m?.costo||0)).toFixed(2)}</td></tr>`;}).join('')}
-        ${eqsTec.map(e=>{const m=getMaterial(e.matId);return`<tr><td><i class="fas fa-barcode me-1 text-primary"></i>${m?.nombre||'—'}</td><td><code style="font-size:.75rem">${sanitize(e.serial)}</code></td><td>$${(m?.costo||0).toFixed(2)}</td></tr>`;}).join('')}
-        </tbody><tfoot><tr><td colspan="2" style="padding:.5rem .85rem;font-size:.8rem">TOTAL CUSTODIA</td><td style="padding:.5rem .85rem;font-weight:700;color:var(--dn-blue)">$${totalVal.toFixed(2)}</td></tr></tfoot>
-      </table></div>`:`<div class="panel-body text-muted" style="font-size:.85rem"><i class="fas fa-check-circle text-success me-1"></i>Sin material</div>`}
-    </div>`;
-  }).join('');
+  saveDB(); renderEquipos(); toast('Equipo dado de baja');
 }
 
 // ══════════════════════════════════════════════
-//  INICIO
+//  BOOTSTRAP ACTIVE BUTTON FIX
+// ══════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.btn-outline-dn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const group = this.closest('.d-flex');
+      if (group) group.querySelectorAll('.btn-outline-dn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+    });
+  });
+});
+
+// ══════════════════════════════════════════════
+//  START
 // ══════════════════════════════════════════════
 loadDB();
 </script>
